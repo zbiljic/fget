@@ -1,0 +1,30 @@
+project_name: fget
+
+before:
+  hooks:
+    - go mod download all
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s
+      - -w
+      - -X "{{ .ModulePath }}/version.GitCommit={{ .ShortCommit }}"
+      - -X "{{ .ModulePath }}/version.Version={{ .Version }}"
+      - -X "{{ .ModulePath }}/version.BuiltBy=goreleaser"
+
+archives:
+  - files:
+      - none*
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-SNAPSHOT-{{ .ShortCommit }}"
+
+changelog:
+  skip: true
+
+release:
+  disable: true
