@@ -3,11 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
-	giturls "github.com/whilp/git-urls"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
 )
@@ -49,22 +47,12 @@ func runList(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		remote, err := repo.Remote(git.DefaultRemoteName)
+		project, err := gitProjectID(repo)
 		if err != nil {
 			return err
 		}
 
-		if repoURL := remote.Config().URLs[0]; repoURL != "" {
-			// parse URI
-			parsedURI, err := giturls.Parse(repoURL)
-			if err != nil {
-				return err
-			}
-
-			project := filepath.Join(parsedURI.Host, parsedURI.Path)
-
-			fmt.Fprintln(os.Stdout, project)
-		}
+		fmt.Fprintln(os.Stdout, project)
 	}
 
 	return nil
