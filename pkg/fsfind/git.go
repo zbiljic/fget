@@ -20,7 +20,7 @@ func GitDirectoriesTree(paths ...string) (art.Tree, error) {
 		key := art.Key(dir)
 
 		if info.IsDir() && strings.EqualFold(".git", info.Name()) {
-			tree.Insert(key, struct{}{})
+			tree.Insert(key, nil)
 			return filepath.SkipDir
 		}
 
