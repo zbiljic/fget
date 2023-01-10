@@ -1,0 +1,31 @@
+name: golangci-lint
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  GO_VERSION: 1.19.5
+  GOLANGCI_LINT_VERSION: 1.50.1
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3.3.0
+      - uses: actions/setup-go@v3.5.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3.3.1
+        with:
+          version: v${{ env.GOLANGCI_LINT_VERSION }}
