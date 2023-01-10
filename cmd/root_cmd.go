@@ -24,7 +24,7 @@ var rootCmd = &cobra.Command{
 	),
 	Short:         "Remote repositories manager.",
 	Long:          `Remote repositories manager.`,
-	Args:          cobra.RangeArgs(0, 2),
+	Args:          cobra.ArbitraryArgs,
 	RunE:          runRoot,
 	SilenceErrors: true,
 	SilenceUsage:  true,
@@ -43,6 +43,11 @@ func Execute() {
 }
 
 func runRoot(cmd *cobra.Command, args []string) error {
-	cmd.Usage() //nolint:errcheck
-	return errors.New("unknown command arguments")
+	switch {
+	case isCloneCmd(cmd, args):
+		return runClone(cmd, args)
+	default:
+		cmd.Usage() //nolint:errcheck
+		return errors.New("unknown command arguments")
+	}
 }
