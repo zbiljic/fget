@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/imdario/mergo"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
@@ -79,19 +78,19 @@ func runFix(cmd *cobra.Command, args []string) error {
 					return err
 				}
 
-				printInfoNoEndline(os.Stdout, "%s", project)
-				printInfoNoEndline(os.Stdout, " [")
-				printWarningNoEndline(os.Stdout, "'%s': reference broken", ref.Name())
-				printInfoNoEndline(os.Stdout, "]: ")
+				pterm.Print(project)
+				pterm.Print(" [")
+				pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...).Printf("'%s': reference broken", ref.Name())
+				pterm.Print("]: ")
 
 				if opts.DryRun {
-					printSuccess(os.Stdout, "dry-run")
+					pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("dry-run")
 				} else {
 					err := repo.Storer.RemoveReference(ref.Name())
 					if err != nil {
-						printErr(os.Stdout, err)
+						pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
 					} else {
-						printSuccess(os.Stdout, "success")
+						pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("success")
 					}
 				}
 			}

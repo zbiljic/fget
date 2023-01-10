@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
@@ -59,8 +60,8 @@ func runClone(cmd *cobra.Command, args []string) error {
 		// create path into which to clone
 		repoPath := filepath.Join(opts.RootDirectory, projectID)
 
-		printInfo(os.Stdout, "%s", repoPath)
-		printInfo(os.Stdout, "%s", projectID)
+		pterm.Println(repoPath)
+		pterm.Println(projectID)
 
 		// clone
 		buf := bytes.NewBuffer(nil)
@@ -71,17 +72,21 @@ func runClone(cmd *cobra.Command, args []string) error {
 		})
 		if err != nil {
 			if errors.Is(err, git.ErrRepositoryAlreadyExists) {
-				printWarning(os.Stdout, "%s", err.Error())
-				printInfo(os.Stdout, "")
+				pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...).Println(err.Error())
+				pterm.Println()
 				continue
 			}
 
+			pterm.Println()
 			return err
 		}
 
 		if buf.Len() > 0 {
-			printInfo(os.Stdout, buf.String())
+			pterm.Println()
+			pterm.Println(buf.String())
 		}
+
+		pterm.Println()
 	}
 
 	return nil
