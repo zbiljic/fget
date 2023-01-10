@@ -1,10 +1,12 @@
 package fsfind
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 )
+
+var ErrNotDirectory = errors.New("not directory")
 
 func DirAbsPath(path string) (string, error) {
 	path, err := filepath.Abs(path)
@@ -18,7 +20,7 @@ func DirAbsPath(path string) (string, error) {
 	}
 
 	if !fileInfo.IsDir() {
-		return "", fmt.Errorf("path is not directory: %s", path)
+		return "", ErrNotDirectory
 	}
 
 	return path, nil
