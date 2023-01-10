@@ -41,7 +41,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 
 	for _, url := range opts.URLs {
 		var (
-			domainDirectory = url.Host
+			domainDirectory = filepath.Join(opts.RootDirectory, url.Host)
 			projectID       = filepath.Join(url.Host, url.Path)
 			repoURL         = url.String()
 		)
