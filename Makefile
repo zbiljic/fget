@@ -5,6 +5,8 @@ THIS_OS := $(shell uname)
 GOTESTSUM_VERSION ?= v1.8.2
 GOLANGCI_LINT ?= $(shell which golangci-lint)
 GOLANGCI_LINT_VERSION ?= v1.50.1
+GOFUMPT ?= $(shell which gofumpt)
+GOFUMPT_VERSION ?= v0.4.0
 GORELEASER ?= $(shell which goreleaser)
 GORELEASER_VERSION ?= v1.14.1
 
@@ -39,7 +41,7 @@ deps: ## Install build and development dependencies
 lint-deps: ## Install linter dependencies
 	@echo "==> Updating linter dependencies..."
 	@which golangci-lint 2>/dev/null || ( curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION) && echo "Installed golangci-lint" )
-	@which gofumpt 2>/dev/null || ( go install mvdan.cc/gofumpt@latest && echo "Installed gofumpt" )
+	@which gofumpt 2>/dev/null || ( go install mvdan.cc/gofumpt@$(GOFUMPT_VERSION) && echo "Installed gofumpt" )
 
 .PHONY: build-deps
 build-deps: ## Install builder dependencies
@@ -67,7 +69,7 @@ check: ## Lint the source code
 
 .PHONY: gofmt
 gofmt: ## Format Go code
-	@gofumpt -extra -l -w .
+	$(GOFUMPT) -extra -l -w .
 
 .PHONY: gogenerate
 gogenerate: ## Generate code from Go code
