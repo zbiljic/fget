@@ -108,8 +108,16 @@ func parseCloneArgs(args []string) (cloneOptions, error) {
 			return opts, err
 		}
 
+		if parsedURI.Host == "" {
+			continue
+		}
+
 		opts.URLs = append(opts.URLs, parsedURI)
 		urlArgsLastIndex = i
+	}
+
+	if len(opts.URLs) == 0 {
+		return opts, errors.New("requires at least 1 URL argument, received 0")
 	}
 
 	if len(args) > urlArgsLastIndex+1 {
