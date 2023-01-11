@@ -6,6 +6,7 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/imdario/mergo v0.3.13
+	github.com/mattn/go-isatty v0.0.17
 	github.com/plar/go-adaptive-radix-tree v1.0.5
 	github.com/pterm/pterm v0.12.53
 	github.com/spf13/cobra v1.6.1

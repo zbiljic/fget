@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/pterm/pterm"
@@ -64,6 +65,15 @@ func runClone(cmd *cobra.Command, args []string) error {
 		pterm.Println(projectID)
 
 		// clone
+		startedAt := time.Now()
+
+		spinner, err := pterm.DefaultSpinner.
+			WithWriter(dynamicOutput).
+			Start("cloning...")
+		if err != nil {
+			return err
+		}
+
 		buf := bytes.NewBuffer(nil)
 
 		_, err = git.PlainClone(repoPath, false, &git.CloneOptions{
@@ -72,20 +82,22 @@ func runClone(cmd *cobra.Command, args []string) error {
 		})
 		if err != nil {
 			if errors.Is(err, git.ErrRepositoryAlreadyExists) {
-				pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...).Println(err.Error())
+				spinner.Warning(err.Error())
 				pterm.Println()
 				continue
 			}
 
+			spinner.Fail(err.Error())
 			pterm.Println()
 			return err
 		}
 
 		if buf.Len() > 0 {
-			pterm.Println()
-			pterm.Println(buf.String())
+			pterm.Fprintln(dynamicOutput)
+			pterm.Fprintln(dynamicOutput, buf.String())
 		}
 
+		spinner.Success(fmt.Sprintf("took %s", time.Since(startedAt).Round(time.Millisecond).String()))
 		pterm.Println()
 	}
 

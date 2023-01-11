@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/go-git/go-git/v5"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
@@ -33,10 +31,20 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	spinner, err := pterm.DefaultSpinner.
+		WithWriter(dynamicOutput).
+		WithRemoveWhenDone(true).
+		Start("finding repositories...")
+	if err != nil {
+		return err
+	}
+
 	repoPaths, err := fsfind.GitDirectoriesTree(opts.Roots...)
 	if err != nil {
 		return err
 	}
+
+	spinner.Stop() //nolint:errcheck
 
 	for it := repoPaths.Iterator(); it.HasNext(); {
 		node, _ := it.Next()
@@ -52,7 +60,7 @@ func runList(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		fmt.Fprintln(os.Stdout, project)
+		pterm.Println(project)
 	}
 
 	return nil

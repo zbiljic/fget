@@ -41,10 +41,20 @@ func runFix(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	spinner, err := pterm.DefaultSpinner.
+		WithWriter(dynamicOutput).
+		WithRemoveWhenDone(true).
+		Start("finding repositories...")
+	if err != nil {
+		return err
+	}
+
 	repoPaths, err := fsfind.GitDirectoriesTree(opts.Roots...)
 	if err != nil {
 		return err
 	}
+
+	spinner.Stop() //nolint:errcheck
 
 	for it := repoPaths.Iterator(); it.HasNext(); {
 		node, _ := it.Next()
