@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
+	"context"
+
 	"github.com/imdario/mergo"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -56,58 +56,14 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 	spinner.Stop() //nolint:errcheck
 
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
+
 	for it := repoPaths.Iterator(); it.HasNext(); {
 		node, _ := it.Next()
 		repoPath := string(node.Key())
 
-		repo, err := git.PlainOpen(repoPath)
-		if err != nil {
-			return err
-		}
-
-		it, err := repo.Storer.IterReferences()
-		if err != nil {
-			return err
-		}
-		defer it.Close()
-
-		err = it.ForEach(func(ref *plumbing.Reference) error {
-			// exit this iteration early for non-hash references
-			if ref.Type() != plumbing.HashReference {
-				return nil
-			}
-
-			// skip tags
-			if ref.Name().IsTag() {
-				return nil
-			}
-
-			if ref.Hash().IsZero() {
-				project, err := gitRepoProjectID(repo)
-				if err != nil {
-					return err
-				}
-
-				pterm.Print(project)
-				pterm.Print(" [")
-				pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...).Printf("'%s': reference broken", ref.Name())
-				pterm.Print("]: ")
-
-				if opts.DryRun {
-					pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("dry-run")
-				} else {
-					err := repo.Storer.RemoveReference(ref.Name())
-					if err != nil {
-						pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
-					} else {
-						pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("success")
-					}
-				}
-			}
-
-			return nil
-		})
-		if err != nil {
+		if err := gitFixReferences(ctx, repoPath); err != nil {
 			return err
 		}
 	}
