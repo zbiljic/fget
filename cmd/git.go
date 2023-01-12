@@ -11,34 +11,64 @@ import (
 	giturls "github.com/whilp/git-urls"
 )
 
-func gitProjectID(repoPath string) (string, error) {
+func gitProjectInfo(repoPath string) (string, string, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return gitRepoProjectID(repo)
+	return gitRepoProjectInfo(repo)
 }
 
-func gitRepoProjectID(repo *git.Repository) (string, error) {
+func gitRepoProjectInfo(repo *git.Repository) (string, string, error) {
+	var (
+		id         string
+		branchName string
+	)
+
 	remote, err := repo.Remote(git.DefaultRemoteName)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if repoURL := remote.Config().URLs[0]; repoURL != "" {
 		// parse URI
 		parsedURI, err := giturls.Parse(repoURL)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
-		project := filepath.Join(parsedURI.Host, parsedURI.Path)
-
-		return project, nil
+		id = filepath.Join(parsedURI.Host, parsedURI.Path)
+	} else {
+		return "", "", errors.New("empty repository remote URL")
 	}
 
-	return "", errors.New("failed to read repo URL")
+	branchName, err = gitRepoHeadBranch(repo)
+	if err != nil {
+		return "", "", err
+	}
+
+	return id, branchName, nil
+}
+
+func gitRepoHeadBranch(repo *git.Repository) (string, error) {
+	headRef, err := repo.Head()
+	if err != nil {
+		return "", err
+	}
+
+	config, err := repo.Config()
+	if err != nil {
+		return "", err
+	}
+
+	for branchName, branchConfig := range config.Branches {
+		if headRef.Name() == branchConfig.Merge {
+			return branchName, nil
+		}
+	}
+
+	return "", errors.New("repository branch name")
 }
 
 func gitFixReferences(ctx context.Context, repoPath string) error {
@@ -90,7 +120,7 @@ func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.R
 		return err
 	}
 
-	project, err := gitRepoProjectID(repo)
+	project, _, err := gitRepoProjectInfo(repo)
 	if err != nil {
 		return err
 	}
@@ -129,7 +159,7 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
-	project, err := gitProjectID(repoPath)
+	project, _, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return err
 	}
