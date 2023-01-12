@@ -8,7 +8,16 @@ import (
 	giturls "github.com/whilp/git-urls"
 )
 
-func gitProjectID(repo *git.Repository) (string, error) {
+func gitProjectID(repoPath string) (string, error) {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return "", err
+	}
+
+	return gitRepoProjectID(repo)
+}
+
+func gitRepoProjectID(repo *git.Repository) (string, error) {
 	remote, err := repo.Remote(git.DefaultRemoteName)
 	if err != nil {
 		return "", err

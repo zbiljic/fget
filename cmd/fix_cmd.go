@@ -83,7 +83,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 			}
 
 			if ref.Hash().IsZero() {
-				project, err := gitProjectID(repo)
+				project, err := gitRepoProjectID(repo)
 				if err != nil {
 					return err
 				}

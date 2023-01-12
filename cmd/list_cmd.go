@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/go-git/go-git/v5"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
@@ -50,12 +49,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		node, _ := it.Next()
 		repoPath := string(node.Key())
 
-		repo, err := git.PlainOpen(repoPath)
-		if err != nil {
-			return err
-		}
-
-		project, err := gitProjectID(repo)
+		project, err := gitProjectID(repoPath)
 		if err != nil {
 			return err
 		}
