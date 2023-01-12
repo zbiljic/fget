@@ -113,3 +113,82 @@ func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.R
 
 	return nil
 }
+
+func gitMakeClean(ctx context.Context, repoPath string) error {
+	isClean, err := gitIsClean(ctx, repoPath)
+	if err != nil {
+		return err
+	}
+
+	if isClean {
+		return nil
+	}
+
+	updateMutex.Lock()
+	defer updateMutex.Unlock()
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	project, err := gitProjectID(repoPath)
+	if err != nil {
+		return err
+	}
+
+	pterm.Print(project)
+	pterm.Print(" [")
+	pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...).Print("reset")
+	pterm.Print("]: ")
+
+	if dryRun {
+		pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("dry-run")
+	} else {
+		err = gitReset(ctx, repoPath)
+		if err != nil {
+			pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
+		} else {
+			pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("success")
+		}
+	}
+
+	return nil
+}
+
+func gitIsClean(ctx context.Context, repoPath string) (bool, error) {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return false, err
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return false, err
+	}
+
+	status, err := worktree.Status()
+	if err != nil {
+		return false, err
+	}
+
+	return status.IsClean(), nil
+}
+
+func gitReset(ctx context.Context, repoPath string) error {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return err
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	err = worktree.Reset(&git.ResetOptions{
+		Mode: git.HardReset,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
