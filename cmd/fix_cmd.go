@@ -80,6 +80,10 @@ func runFix(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
+		if err := gitUpdateDefaultBranch(ctx, repoPath); err != nil {
+			return err
+		}
+
 		pterm.Println()
 	}
 
