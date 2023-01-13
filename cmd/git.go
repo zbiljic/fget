@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"net/url"
 	"path/filepath"
 
 	"github.com/go-git/go-git/v5"
@@ -11,64 +12,57 @@ import (
 	giturls "github.com/whilp/git-urls"
 )
 
-func gitProjectInfo(repoPath string) (string, string, error) {
+func gitProjectInfo(repoPath string) (string, *plumbing.Reference, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 
 	return gitRepoProjectInfo(repo)
 }
 
-func gitRepoProjectInfo(repo *git.Repository) (string, string, error) {
-	var (
-		id         string
-		branchName string
-	)
+func gitRepoProjectInfo(repo *git.Repository) (string, *plumbing.Reference, error) {
+	remoteURL, err := gitRepoRemoteConfigURL(repo)
+	if err != nil {
+		return "", nil, err
+	}
 
+	id := filepath.Join(remoteURL.Host, remoteURL.Path)
+
+	headRef, err := gitRepoHeadBranch(repo)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return id, headRef, nil
+}
+
+func gitRepoRemoteConfigURL(repo *git.Repository) (*url.URL, error) {
 	remote, err := repo.Remote(git.DefaultRemoteName)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	if repoURL := remote.Config().URLs[0]; repoURL != "" {
 		// parse URI
 		parsedURI, err := giturls.Parse(repoURL)
 		if err != nil {
-			return "", "", err
+			return nil, err
 		}
 
-		id = filepath.Join(parsedURI.Host, parsedURI.Path)
+		return parsedURI, nil
 	} else {
-		return "", "", errors.New("empty repository remote URL")
+		return nil, errors.New("empty repository remote URL")
 	}
-
-	branchName, err = gitRepoHeadBranch(repo)
-	if err != nil {
-		return "", "", err
-	}
-
-	return id, branchName, nil
 }
 
-func gitRepoHeadBranch(repo *git.Repository) (string, error) {
+func gitRepoHeadBranch(repo *git.Repository) (*plumbing.Reference, error) {
 	headRef, err := repo.Head()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	config, err := repo.Config()
-	if err != nil {
-		return "", err
-	}
-
-	for branchName, branchConfig := range config.Branches {
-		if headRef.Name() == branchConfig.Merge {
-			return branchName, nil
-		}
-	}
-
-	return "", errors.New("repository branch name")
+	return headRef, nil
 }
 
 func gitFixReferences(ctx context.Context, repoPath string) error {
