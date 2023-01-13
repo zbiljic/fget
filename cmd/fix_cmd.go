@@ -63,6 +63,15 @@ func runFix(cmd *cobra.Command, args []string) error {
 		node, _ := it.Next()
 		repoPath := string(node.Key())
 
+		project, branchName, err := gitProjectInfo(repoPath)
+		if err != nil {
+			return err
+		}
+
+		pterm.Println(repoPath)
+		pterm.NewStyle(pterm.ThemeDefault.InfoMessageStyle...).Println(project)
+		pterm.NewStyle(pterm.ThemeDefault.ScopeStyle...).Println(branchName.Name().Short())
+
 		if err := gitFixReferences(ctx, repoPath); err != nil {
 			return err
 		}
@@ -70,6 +79,8 @@ func runFix(cmd *cobra.Command, args []string) error {
 		if err := gitMakeClean(ctx, repoPath); err != nil {
 			return err
 		}
+
+		pterm.Println()
 	}
 
 	return nil

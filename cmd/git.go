@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"path/filepath"
 
@@ -114,24 +115,19 @@ func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.R
 		return err
 	}
 
-	project, _, err := gitRepoProjectInfo(repo)
-	if err != nil {
-		return err
-	}
-
-	pterm.Print(project)
-	pterm.Print(" [")
-	pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...).Printf("'%s': reference broken", refName)
-	pterm.Print("]: ")
+	prefixPrinter := pterm.Warning.WithPrefix(pterm.Prefix{
+		Style: pterm.Warning.Prefix.Style,
+		Text:  fmt.Sprintf("reference broken: '%s'", refName),
+	})
 
 	if dryRun {
-		pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("dry-run")
+		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
 	} else {
 		err := repo.Storer.RemoveReference(refName)
 		if err != nil {
-			pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 		} else {
-			pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("success")
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
 		}
 	}
 
@@ -153,24 +149,19 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
-	project, _, err := gitProjectInfo(repoPath)
-	if err != nil {
-		return err
-	}
-
-	pterm.Print(project)
-	pterm.Print(" [")
-	pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...).Print("reset")
-	pterm.Print("]: ")
+	prefixPrinter := pterm.Warning.WithPrefix(pterm.Prefix{
+		Style: pterm.Warning.Prefix.Style,
+		Text:  "reset",
+	})
 
 	if dryRun {
-		pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("dry-run")
+		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
 	} else {
 		err = gitReset(ctx, repoPath)
 		if err != nil {
-			pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 		} else {
-			pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...).Println("success")
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
 		}
 	}
 
