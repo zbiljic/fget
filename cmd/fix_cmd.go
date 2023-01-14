@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"strings"
 
 	"github.com/imdario/mergo"
 	"github.com/pterm/pterm"
@@ -41,6 +42,21 @@ func runFix(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// for configuration
+	baseDir := opts.Roots[0]
+	configStateName := cmd.Name()
+
+	config, err := loadOrCreateConfigState(baseDir, configStateName, opts.Roots...)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := finishConfigState(baseDir, configStateName, config); err != nil {
+			pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
+		}
+	}()
+
 	spinner, err := pterm.DefaultSpinner.
 		WithWriter(dynamicOutput).
 		WithRemoveWhenDone(true).
@@ -59,9 +75,33 @@ func runFix(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
 
-	for it := repoPaths.Iterator(); it.HasNext(); {
+	it := repoPaths.Iterator()
+
+	if config.Checkpoint != "" {
+		// skip until previous checkpoint
+		for it.HasNext() {
+			node, _ := it.Next()
+			repoPath := string(node.Key())
+
+			if strings.EqualFold(repoPath, config.Checkpoint) {
+				// found checkpoint
+				break
+			} else {
+				// skip this path
+				continue
+			}
+		}
+	}
+
+	for i := 0; it.HasNext(); i++ {
 		node, _ := it.Next()
 		repoPath := string(node.Key())
+
+		if err := saveCheckpointConfigState(baseDir, configStateName, config, i); err != nil {
+			return err
+		}
+
+		config.Checkpoint = repoPath
 
 		project, branchName, err := gitProjectInfo(repoPath)
 		if err != nil {
@@ -86,6 +126,9 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 		pterm.Println()
 	}
+
+	// in order to clear configuration file
+	config.Checkpoint = ""
 
 	return nil
 }
