@@ -6,5 +6,13 @@ import "sync"
 var updateMutex = &sync.RWMutex{}
 
 type (
-	ctxKeyDryRun struct{}
+	ctxKeyDryRun                   struct{}
+	ctxKeyPrintProjectInfoHeaderFn struct{}
+	ctxKeyIsUpdateMutexLocked      struct{}
+	ctxKeyShouldUpdateMutexUnlock  struct{}
+)
+
+const (
+	poolDefaultMaxWorkers  = 10
+	poolDefaultMaxCapacity = 100
 )

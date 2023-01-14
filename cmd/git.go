@@ -16,7 +16,9 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/pterm/pterm"
+	"github.com/tevino/abool/v2"
 	giturls "github.com/whilp/git-urls"
+
 	"github.com/zbiljic/fget/pkg/gitexec"
 )
 
@@ -134,8 +136,29 @@ func gitFixReferences(ctx context.Context, repoPath string) error {
 }
 
 func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.ReferenceName) error {
-	updateMutex.Lock()
-	defer updateMutex.Unlock()
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	// print info if executing
+	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
+		printProjectInfoHeaderFn()
+	}
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
@@ -173,8 +196,29 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 		return nil
 	}
 
-	updateMutex.Lock()
-	defer updateMutex.Unlock()
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	// print info if executing
+	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
+		printProjectInfoHeaderFn()
+	}
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
@@ -249,6 +293,33 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 	})
 
 	remoteHeadRef, err := gitFindRemoteHeadReference(ctx, repoPath)
+	// NOTE: error check comes after lock
+
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	// print info if executing
+	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
+		printProjectInfoHeaderFn()
+	}
+
+	// NOTE: delayed error check
 	if err != nil {
 		if errors.Is(err, ErrGitMissingRemoteHeadReference) {
 			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
@@ -289,9 +360,6 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 	if branchName == remoteHeadBranchName {
 		return nil
 	}
-
-	updateMutex.Lock()
-	defer updateMutex.Unlock()
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 

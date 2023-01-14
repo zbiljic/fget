@@ -3,6 +3,7 @@ module github.com/zbiljic/fget
 go 1.19
 
 require (
+	github.com/alitto/pond v1.8.2
 	github.com/coreos/go-semver v0.3.0
 	github.com/go-git/go-billy/v5 v5.4.0
 	github.com/go-git/go-git/v5 v5.5.2
@@ -11,6 +12,7 @@ require (
 	github.com/plar/go-adaptive-radix-tree v1.0.5
 	github.com/pterm/pterm v0.12.53
 	github.com/spf13/cobra v1.6.1
+	github.com/tevino/abool/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
 )
 

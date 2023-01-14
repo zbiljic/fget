@@ -25,7 +25,7 @@ func loadOrCreateConfigState(baseDir, stateName string, roots ...string) (*confi
 func saveCheckpointConfigState(baseDir, stateName string, config *configStateV1, index int) error {
 	if index%configStateCheckpointInterval == 0 {
 		if err := saveConfigStateV1(baseDir, stateName, config); err != nil {
-			return err
+			return fmt.Errorf("save checkpoint config state: %w", err)
 		}
 	}
 
