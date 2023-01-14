@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alitto/pond"
 	"github.com/imdario/mergo"
@@ -84,6 +86,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 	})
 
 	// fix
+	startedAt := time.Now()
 
 	i := 1
 	it := repoPaths.Iterator()
@@ -196,6 +199,11 @@ func runFix(cmd *cobra.Command, args []string) error {
 	if err := group.Wait(); err != nil {
 		return err
 	}
+
+	pterm.Success.WithPrefix(pterm.Prefix{
+		Style: pterm.Success.Prefix.Style,
+		Text:  configStateName,
+	}).Println(fmt.Sprintf("took %s", time.Since(startedAt).Round(time.Millisecond).String()))
 
 	// in order to clear configuration file
 	config.Checkpoint = ""
