@@ -125,8 +125,6 @@ func runFix(cmd *cobra.Command, args []string) error {
 		repoPath := string(node.Key())
 
 		group.Submit(func() error {
-			defer pterm.Println()
-
 			var (
 				printProjectInfoHeaderOnce sync.Once
 				isUpdateMutexLocked        = abool.New()
@@ -140,6 +138,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 						return
 					}
 
+					pterm.Println()
 					pterm.Printfln("[%d/%d] (active: %d)", i, repoPaths.Size(), activeRepoPaths.Size())
 					pterm.Println(repoPath)
 					pterm.NewStyle(pterm.ThemeDefault.InfoMessageStyle...).Println(project)
