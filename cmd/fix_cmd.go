@@ -99,12 +99,13 @@ func runFix(cmd *cobra.Command, args []string) error {
 			node, _ := it.Next()
 			repoPath := string(node.Key())
 
+			activeRepoPaths.Delete(node.Key())
+
 			if strings.EqualFold(repoPath, config.Checkpoint) {
 				// found checkpoint
 				break
 			} else {
 				// skip this path
-				activeRepoPaths.Delete(node.Key())
 				continue
 			}
 		}
