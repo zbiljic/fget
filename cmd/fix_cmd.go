@@ -19,7 +19,7 @@ import (
 
 var fixCmd = &cobra.Command{
 	Use:         "fix",
-	Short:       "List local repositories",
+	Short:       "Fixes inconsistencies found in the local repository",
 	Annotations: map[string]string{"group": "update"},
 	Args:        cobra.ArbitraryArgs,
 	RunE:        runFix,
