@@ -128,6 +128,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 			var (
 				printProjectInfoHeaderOnce sync.Once
 				isUpdateMutexLocked        = abool.New()
+				errored                    = abool.New()
 			)
 
 			printProjectInfoHeaderFn := func() {
@@ -155,6 +156,10 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 				printProjectInfoHeaderFn()
 
+				if errored.IsSet() {
+					return
+				}
+
 				// for state configuration
 				activeRepoPaths.Delete(art.Key(repoPath))
 
@@ -181,14 +186,17 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 			// actual operations
 			if err := gitFixReferences(ctx, repoPath); err != nil {
+				errored.Set()
 				return err
 			}
 
 			if err := gitMakeClean(ctx, repoPath); err != nil {
+				errored.Set()
 				return err
 			}
 
 			if err := gitUpdateDefaultBranch(ctx, repoPath); err != nil {
+				errored.Set()
 				return err
 			}
 
