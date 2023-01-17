@@ -160,9 +160,6 @@ func runFix(cmd *cobra.Command, args []string) error {
 					return
 				}
 
-				// for state configuration
-				activeRepoPaths.Delete(art.Key(repoPath))
-
 				// find first still active path
 				for it := activeRepoPaths.Iterator(); it.HasNext(); {
 					node, _ := it.Next()
@@ -171,6 +168,8 @@ func runFix(cmd *cobra.Command, args []string) error {
 					config.Checkpoint = repoPath
 					break
 				}
+
+				activeRepoPaths.Delete(art.Key(repoPath))
 
 				if err := saveCheckpointConfigState(baseDir, configStateName, config, i); err != nil {
 					pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
