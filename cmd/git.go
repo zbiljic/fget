@@ -87,9 +87,9 @@ func gitRepoRemoteConfigURL(repo *git.Repository) (*url.URL, error) {
 		}
 
 		return parsedURI, nil
-	} else {
-		return nil, errors.New("empty repository remote URL")
 	}
+
+	return nil, errors.New("empty repository remote URL")
 }
 
 func gitRepoHeadBranch(repo *git.Repository) (*plumbing.Reference, error) {
@@ -178,14 +178,15 @@ func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.R
 
 	if dryRun {
 		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
-	} else {
-		err := repo.Storer.RemoveReference(refName)
-		if err != nil {
-			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
-		} else {
-			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
-		}
+		return nil
 	}
+
+	if err := repo.Storer.RemoveReference(refName); err != nil {
+		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		return nil
+	}
+
+	prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
 
 	return nil
 }
@@ -233,14 +234,15 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 
 	if dryRun {
 		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
-	} else {
-		err = gitReset(ctx, repoPath)
-		if err != nil {
-			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
-		} else {
-			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
-		}
+		return nil
 	}
+
+	if err := gitReset(ctx, repoPath); err != nil {
+		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		return nil
+	}
+
+	prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
 
 	return nil
 }
@@ -371,14 +373,15 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 
 	if dryRun {
 		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
-	} else {
-		err = gitReplaceDefaultBranch(ctx, repoPath, headRef, remoteHeadRef)
-		if err != nil {
-			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
-		} else {
-			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
-		}
+		return nil
 	}
+
+	if err := gitReplaceDefaultBranch(ctx, repoPath, headRef, remoteHeadRef); err != nil {
+		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		return nil
+	}
+
+	prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
 
 	return nil
 }
