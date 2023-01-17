@@ -29,3 +29,24 @@ func init() {
 		dynamicOutput = os.Stderr
 	}
 }
+
+var (
+	ptermInfoMessageStyle    = pterm.NewStyle(pterm.ThemeDefault.InfoMessageStyle...)
+	ptermSuccessMessageStyle = pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...)
+	ptermErrorMessageStyle   = pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...)
+	ptermScopeStyle          = pterm.NewStyle(pterm.ThemeDefault.ScopeStyle...)
+)
+
+func ptermWarningWithPrefixText(text string) *pterm.PrefixPrinter {
+	return pterm.Warning.WithPrefix(pterm.Prefix{
+		Style: pterm.Warning.Prefix.Style,
+		Text:  text,
+	})
+}
+
+func ptermSuccessWithPrefixText(text string) *pterm.PrefixPrinter {
+	return pterm.Success.WithPrefix(pterm.Prefix{
+		Style: pterm.Success.Prefix.Style,
+		Text:  text,
+	})
+}

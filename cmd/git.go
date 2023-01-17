@@ -171,22 +171,22 @@ func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.R
 		return err
 	}
 
-	prefixPrinter := pterm.Warning.WithPrefix(pterm.Prefix{
-		Style: pterm.Warning.Prefix.Style,
-		Text:  fmt.Sprintf("reference broken: '%s'", refName),
-	})
+	prefixPrinter := ptermWarningWithPrefixText("remove reference")
+
+	prefixPrinter.Printf("'%s'", refName)
+	pterm.Print(": ")
 
 	if dryRun {
-		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
+		ptermSuccessMessageStyle.Println("dry-run")
 		return nil
 	}
 
 	if err := repo.Storer.RemoveReference(refName); err != nil {
-		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		ptermErrorMessageStyle.Println(err.Error())
 		return nil
 	}
 
-	prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
+	ptermSuccessMessageStyle.Println("success")
 
 	return nil
 }
@@ -227,22 +227,21 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
-	prefixPrinter := pterm.Warning.WithPrefix(pterm.Prefix{
-		Style: pterm.Warning.Prefix.Style,
-		Text:  "reset",
-	})
+	prefixPrinter := ptermWarningWithPrefixText("reset")
+
+	prefixPrinter.Print()
 
 	if dryRun {
-		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
+		ptermSuccessMessageStyle.Println("dry-run")
 		return nil
 	}
 
 	if err := gitReset(ctx, repoPath); err != nil {
-		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		ptermErrorMessageStyle.Println(err.Error())
 		return nil
 	}
 
-	prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
+	ptermSuccessMessageStyle.Println("success")
 
 	return nil
 }
@@ -293,10 +292,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 		return err
 	}
 
-	prefixPrinter := pterm.Warning.WithPrefix(pterm.Prefix{
-		Style: pterm.Warning.Prefix.Style,
-		Text:  "update HEAD",
-	})
+	prefixPrinter := ptermWarningWithPrefixText("update HEAD")
 
 	remoteHeadRef, err := gitFindRemoteHeadReference(ctx, repoPath)
 	// NOTE: error check comes after lock
@@ -340,7 +336,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
-				prefixPrinter.Printf("moved: %s\n", urlError.URL)
+				prefixPrinter.Printfln("moved: %s", urlError.URL)
 			} else {
 				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			}
@@ -369,19 +365,20 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
-	prefixPrinter.Println(remoteHeadBranchName)
+	prefixPrinter.Printf("'%s'", remoteHeadBranchName)
+	pterm.Print(": ")
 
 	if dryRun {
-		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("dry-run")
+		ptermSuccessMessageStyle.Println("dry-run")
 		return nil
 	}
 
 	if err := gitReplaceDefaultBranch(ctx, repoPath, headRef, remoteHeadRef); err != nil {
-		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		ptermErrorMessageStyle.Println(err.Error())
 		return nil
 	}
 
-	prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.SuccessMessageStyle).Println("success")
+	ptermSuccessMessageStyle.Println("success")
 
 	return nil
 }

@@ -59,7 +59,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 	defer func() {
 		if err := finishConfigState(baseDir, configStateName, config); err != nil {
-			pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
+			ptermErrorMessageStyle.Println(err.Error())
 		}
 	}()
 
@@ -135,15 +135,15 @@ func runFix(cmd *cobra.Command, args []string) error {
 				printProjectInfoHeaderOnce.Do(func() {
 					project, branchName, err := gitProjectInfo(repoPath)
 					if err != nil {
-						pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
+						ptermErrorMessageStyle.Println(err.Error())
 						return
 					}
 
 					pterm.Println()
 					pterm.Printfln("[%d/%d] (active: %d)", i, repoPaths.Size(), activeRepoPaths.Size())
 					pterm.Println(repoPath)
-					pterm.NewStyle(pterm.ThemeDefault.InfoMessageStyle...).Println(project)
-					pterm.NewStyle(pterm.ThemeDefault.ScopeStyle...).Println(branchName.Name().Short())
+					ptermInfoMessageStyle.Println(project)
+					ptermScopeStyle.Println(branchName.Name().Short())
 				})
 			}
 
@@ -172,7 +172,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 				activeRepoPaths.Delete(art.Key(repoPath))
 
 				if err := saveCheckpointConfigState(baseDir, configStateName, config, i); err != nil {
-					pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...).Println(err.Error())
+					ptermErrorMessageStyle.Println(err.Error())
 				}
 			}()
 
@@ -196,10 +196,9 @@ func runFix(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pterm.Success.WithPrefix(pterm.Prefix{
-		Style: pterm.Success.Prefix.Style,
-		Text:  configStateName,
-	}).Println(fmt.Sprintf("took %s", time.Since(startedAt).Round(time.Millisecond).String()))
+	pterm.Println()
+	ptermSuccessWithPrefixText(configStateName).
+		Println(fmt.Sprintf("took %s", time.Since(startedAt).Round(time.Millisecond).String()))
 
 	// in order to clear configuration file
 	config.Checkpoint = ""
