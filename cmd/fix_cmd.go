@@ -183,18 +183,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 			ctx = context.WithValue(ctx, ctxKeyIsUpdateMutexLocked{}, isUpdateMutexLocked)
 			ctx = context.WithValue(ctx, ctxKeyShouldUpdateMutexUnlock{}, false)
 
-			// actual operations
-			if err := gitFixReferences(ctx, repoPath); err != nil {
-				errored.Set()
-				return err
-			}
-
-			if err := gitMakeClean(ctx, repoPath); err != nil {
-				errored.Set()
-				return err
-			}
-
-			if err := gitUpdateDefaultBranch(ctx, repoPath); err != nil {
+			if err := gitRunFix(ctx, repoPath); err != nil {
 				errored.Set()
 				return err
 			}
