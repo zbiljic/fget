@@ -10,21 +10,20 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pterm/pterm"
 	"github.com/tevino/abool/v2"
 	giturls "github.com/whilp/git-urls"
 
 	"github.com/zbiljic/fget/pkg/gitexec"
+	"github.com/zbiljic/fget/pkg/rhttp"
 )
 
 const symrefPrefix = "ref: "
-
-const httpGitRemoteCheckTimeout = 10 * time.Second
 
 var (
 	ErrGitMissingRemoteHeadReference  = errors.New("missing remote head reference")
@@ -33,7 +32,12 @@ var (
 	ErrGitRepositoryNotReachable      = errors.New("repository not reachable")
 )
 
-var ErrHttpMovedPermanently = errors.New("moved permanently")
+// gitDefaultClient is used for performing requests without explicitly making
+// a new client. It is purposely private to avoid modifications.
+var gitDefaultClient = rhttp.NewClient(
+	rhttp.WithErrorIfMovedPermanently(),
+	rhttp.WithLogger(nil),
+)
 
 func gitProjectInfo(repoPath string) (string, *plumbing.Reference, error) {
 	repo, err := git.PlainOpen(repoPath)
@@ -331,7 +335,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 			return nil
 		}
 
-		if errors.Is(err, ErrHttpMovedPermanently) {
+		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
 				prefixPrinter.Printf("moved: %s\n", urlError.URL)
@@ -385,30 +389,12 @@ func gitCheckRemoteURL(ctx context.Context, repoPath string) (bool, error) {
 		return false, err
 	}
 
-	httpClient := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// default behavior
-			if len(via) >= 10 {
-				return errors.New("stopped after 10 redirects")
-			}
-
-			if req.Response.StatusCode == http.StatusMovedPermanently {
-				return ErrHttpMovedPermanently
-			}
-
-			return nil
-		},
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, httpGitRemoteCheckTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, remoteURL.String(), nil)
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, remoteURL.String(), nil)
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := gitDefaultClient.Do(req)
 	if err != nil {
 		return false, err
 	}
