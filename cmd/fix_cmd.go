@@ -17,8 +17,10 @@ import (
 	"github.com/zbiljic/fget/pkg/fsfind"
 )
 
+const fixCmdName = "fix"
+
 var fixCmd = &cobra.Command{
-	Use:         "fix",
+	Use:         fixCmdName,
 	Short:       "Fixes inconsistencies found in the local repository",
 	Annotations: map[string]string{"group": "update"},
 	Args:        cobra.ArbitraryArgs,
@@ -50,15 +52,14 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 	// for configuration
 	baseDir := opts.Roots[0]
-	configStateName := cmd.Name()
 
-	config, err := loadOrCreateConfigState(baseDir, configStateName, opts.Roots...)
+	config, err := loadOrCreateConfigState(baseDir, fixCmdName, opts.Roots...)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		if err := finishConfigState(baseDir, configStateName, config); err != nil {
+		if err := finishConfigState(baseDir, fixCmdName, config); err != nil {
 			ptermErrorMessageStyle.Println(err.Error())
 		}
 	}()
@@ -85,7 +86,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 		return true
 	})
 
-	// fix
+	// start
 	startedAt := time.Now()
 
 	i := 1
@@ -147,6 +148,11 @@ func runFix(cmd *cobra.Command, args []string) error {
 				})
 			}
 
+			printErrorFn := func(err error) {
+				printProjectInfoHeaderFn()
+				ptermErrorMessageStyle.Println(err.Error())
+			}
+
 			// cleanup
 			defer func() {
 				if isUpdateMutexLocked.IsNotSet() {
@@ -171,7 +177,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 				activeRepoPaths.Delete(art.Key(repoPath))
 
-				if err := saveCheckpointConfigState(baseDir, configStateName, config, i); err != nil {
+				if err := saveCheckpointConfigState(baseDir, fixCmdName, config, i); err != nil {
 					ptermErrorMessageStyle.Println(err.Error())
 				}
 			}()
@@ -185,7 +191,8 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 			if err := gitRunFix(ctx, repoPath); err != nil {
 				errored.Set()
-				return err
+				printErrorFn(err)
+				return fmt.Errorf("%s '%s': %w", fixCmdName, repoPath, err)
 			}
 
 			return nil
@@ -197,7 +204,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 	}
 
 	pterm.Println()
-	ptermSuccessWithPrefixText(configStateName).
+	ptermSuccessWithPrefixText(fixCmdName).
 		Println(fmt.Sprintf("took %s", time.Since(startedAt).Round(time.Millisecond).String()))
 
 	// in order to clear configuration file
