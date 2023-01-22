@@ -393,7 +393,7 @@ func gitCheckRemoteURL(ctx context.Context, repoPath string) (bool, error) {
 		return false, err
 	}
 
-	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, remoteURL.String(), nil)
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodHead, remoteURL.String(), nil)
 	if err != nil {
 		return false, err
 	}
