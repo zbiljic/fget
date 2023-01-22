@@ -37,6 +37,13 @@ var (
 	ptermScopeStyle          = pterm.NewStyle(pterm.ThemeDefault.ScopeStyle...)
 )
 
+func ptermInfoWithPrefixText(text string) *pterm.PrefixPrinter {
+	return pterm.Info.WithPrefix(pterm.Prefix{
+		Style: pterm.Info.Prefix.Style,
+		Text:  text,
+	})
+}
+
 func ptermWarningWithPrefixText(text string) *pterm.PrefixPrinter {
 	return pterm.Warning.WithPrefix(pterm.Prefix{
 		Style: pterm.Warning.Prefix.Style,
@@ -47,6 +54,20 @@ func ptermWarningWithPrefixText(text string) *pterm.PrefixPrinter {
 func ptermSuccessWithPrefixText(text string) *pterm.PrefixPrinter {
 	return pterm.Success.WithPrefix(pterm.Prefix{
 		Style: pterm.Success.Prefix.Style,
+		Text:  text,
+	})
+}
+
+func ptermDebugWithPrefixText(text string) *pterm.PrefixPrinter {
+	return pterm.Debug.WithPrefix(pterm.Prefix{
+		Style: pterm.Debug.Prefix.Style,
+		Text:  text,
+	})
+}
+
+func ptermDescriptionWithPrefixText(text string) *pterm.PrefixPrinter {
+	return pterm.Description.WithPrefix(pterm.Prefix{
+		Style: pterm.Description.Prefix.Style,
 		Text:  text,
 	})
 }
