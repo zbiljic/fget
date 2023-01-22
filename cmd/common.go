@@ -1,6 +1,9 @@
 package cmd
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 // all changes that modify state should be synchronized
 var updateMutex = &sync.RWMutex{}
@@ -15,4 +18,11 @@ type (
 const (
 	poolDefaultMaxWorkers  = 10
 	poolDefaultMaxCapacity = 100
+)
+
+const (
+	// Default retry configuration
+	defaultRetryWaitMin        = 1 * time.Second
+	defaultRetryWaitMax        = 30 * time.Second
+	defaultRetryMaxElapsedTime = time.Minute
 )

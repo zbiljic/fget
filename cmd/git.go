@@ -10,10 +10,14 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/storage"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pterm/pterm"
 	"github.com/tevino/abool/v2"
@@ -520,4 +524,237 @@ func gitReplaceDefaultBranch(ctx context.Context, repoPath string, from, to *plu
 	}
 
 	return nil
+}
+
+func gitCheckAndPull(ctx context.Context, repoPath string) error {
+	if isRemoteUpToDate, err := gitIsRemoteUpToDate(ctx, repoPath); err != nil {
+		return err
+	} else if isRemoteUpToDate {
+		return git.NoErrAlreadyUpToDate
+	}
+
+	pterm.EnableDebugMessages()
+	defer pterm.DisableDebugMessages()
+
+	prefixPrinter := ptermDebugWithPrefixText("pull")
+
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = defaultRetryWaitMin
+	exp.MaxInterval = defaultRetryWaitMax
+	exp.MaxElapsedTime = defaultRetryMaxElapsedTime
+
+	var attempt int
+	var err error
+
+	for i := 0; ; i++ {
+		attempt++
+
+		if attempt > 1 {
+			prefixPrinter.Printfln("attempt: %d", attempt)
+		}
+
+		// attempt the pull
+		err = gitPull(ctx, repoPath)
+
+		switch {
+		case err == nil:
+			return nil
+		case errors.Is(err, transport.ErrAuthenticationRequired):
+			return nil
+		case errors.Is(err, git.ErrNonFastForwardUpdate):
+			if err1 := gitUpdateDefaultBranch(ctx, repoPath); err1 != nil {
+				return err
+			}
+			// retry
+		case errors.Is(err, git.ErrUnstagedChanges):
+			if err1 := gitMakeClean(ctx, repoPath); err1 != nil {
+				return err
+			}
+			// retry
+		case errors.Is(err, storage.ErrReferenceHasChanged):
+			// retry
+		case errors.Is(err, git.NoErrAlreadyUpToDate):
+			return err
+		default:
+			return err
+		}
+
+		if attempt == 1 {
+			// reset for first retry
+			exp.Reset()
+		}
+
+		wait := exp.NextBackOff()
+		if wait == backoff.Stop {
+			break
+		}
+
+		remain := defaultRetryMaxElapsedTime - exp.GetElapsedTime()
+
+		prefixPrinter.Printfln("retrying in %s (%s left)", wait.Round(time.Millisecond), remain.Round(time.Second))
+
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	if err != nil {
+		prefixPrinter.Printfln("giving up after %d attempt(s): %s", attempt, err.Error())
+	}
+
+	return err
+}
+
+func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
+	_, headRef, err := gitProjectInfo(repoPath)
+	if err != nil {
+		return false, err
+	}
+
+	prefixPrinter := ptermDescriptionWithPrefixText("remote")
+
+	remoteHeadRef, err := gitFindRemoteHeadReference(ctx, repoPath)
+	// NOTE: error check comes after lock
+
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	// print info if executing
+	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
+		printProjectInfoHeaderFn()
+	}
+
+	// NOTE: delayed error check
+	if err != nil {
+		if errors.Is(err, ErrGitMissingRemoteHeadReference) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return false, nil
+		}
+
+		if errors.Is(err, ErrGitRepositoryNotReachable) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return false, nil
+		}
+
+		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
+			var urlError *url.Error
+			if errors.As(err, &urlError) {
+				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.WarningMessageStyle).Printfln("moved: %s", urlError.URL)
+			} else {
+				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			}
+			return false, nil
+		}
+
+		// NOTE: ignore all errors here
+		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		return false, nil
+	}
+
+	if headRef.Hash() == remoteHeadRef.Hash() {
+		prefixPrinter.Println("up-to-date")
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func gitPull(ctx context.Context, repoPath string) error {
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	// print info if executing
+	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
+		printProjectInfoHeaderFn()
+	}
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermInfoWithPrefixText("pull")
+
+	prefixPrinter.Print()
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return err
+	}
+
+	out, err := gitRepoPull(repo)
+	if err != nil {
+		if errors.Is(err, git.NoErrAlreadyUpToDate) {
+			ptermInfoMessageStyle.Println(err.Error())
+		} else {
+			ptermErrorMessageStyle.Println(err.Error())
+		}
+		return err
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	if len(out) > 0 {
+		pterm.Println()
+		pterm.Println(string(out))
+	}
+
+	return nil
+}
+
+func gitRepoPull(repo *git.Repository) ([]byte, error) {
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBuffer(nil)
+
+	err = worktree.Pull(&git.PullOptions{
+		Progress: buf,
+		Force:    true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
