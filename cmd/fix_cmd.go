@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/imdario/mergo"
 	art "github.com/plar/go-adaptive-radix-tree"
 	"github.com/pterm/pterm"
+	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 	"github.com/tevino/abool/v2"
 
@@ -64,53 +64,45 @@ func runFix(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	spinner, err := pterm.DefaultSpinner.
-		WithWriter(dynamicOutput).
-		WithRemoveWhenDone(true).
-		Start("finding repositories...")
-	if err != nil {
-		return err
-	}
+	if len(config.Paths) == 0 {
+		spinner, err := pterm.DefaultSpinner.
+			WithWriter(dynamicOutput).
+			WithRemoveWhenDone(true).
+			Start("finding repositories...")
+		if err != nil {
+			return err
+		}
 
-	repoPaths, err := fsfind.GitDirectoriesTree(opts.Roots...)
-	if err != nil {
-		return err
-	}
+		repoPaths, err := fsfind.GitDirectoriesTree(opts.Roots...)
+		if err != nil {
+			return err
+		}
 
-	spinner.Stop() //nolint:errcheck
+		config.TotalCount = repoPaths.Size()
+
+		// only save if more than one repository
+		if config.TotalCount > 1 {
+			repoPaths.ForEach(func(node art.Node) bool {
+				config.Paths = append(config.Paths, string(node.Key()))
+				return true
+			})
+
+			if err := saveConfigState(baseDir, updateCmdName, config); err != nil {
+				return err
+			}
+		}
+
+		spinner.Stop() //nolint:errcheck
+	}
 
 	// make a copy
-	activeRepoPaths := art.New()
-	repoPaths.ForEach(func(node art.Node) bool {
-		activeRepoPaths.Insert(node.Key(), node.Value())
-		return true
-	})
+	activeRepoPaths := make([]string, len(config.Paths))
+	copy(activeRepoPaths, config.Paths)
 
 	// start
 	startedAt := time.Now()
 
-	i := 1
-	it := repoPaths.Iterator()
-
-	if config.Checkpoint != "" {
-		i++
-
-		// skip until previous checkpoint
-		for ; it.HasNext(); i++ {
-			node, _ := it.Next()
-			repoPath := string(node.Key())
-
-			activeRepoPaths.Delete(node.Key())
-
-			if strings.EqualFold(repoPath, config.Checkpoint) {
-				// found checkpoint
-				break
-			} else {
-				// skip this path
-				continue
-			}
-		}
-	}
+	startOffset := 1 + config.TotalCount - len(activeRepoPaths)
 
 	// worker pool
 	pool := pond.New(poolDefaultMaxWorkers, poolDefaultMaxCapacity)
@@ -119,11 +111,10 @@ func runFix(cmd *cobra.Command, args []string) error {
 	// task group associated to a context
 	group, _ := pool.GroupContext(context.Background())
 
-	for ; it.HasNext(); i++ {
-		i := i
+	for i, path := range config.Paths {
+		i := i + startOffset
 
-		node, _ := it.Next()
-		repoPath := string(node.Key())
+		repoPath := path
 
 		group.Submit(func() error {
 			var (
@@ -141,7 +132,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 					}
 
 					pterm.Println()
-					pterm.Printfln("[%d/%d] (active: %d)", i, repoPaths.Size(), activeRepoPaths.Size())
+					pterm.Printfln("[%d/%d] (active: %d)", i, config.TotalCount, len(activeRepoPaths))
 					pterm.Println(repoPath)
 					ptermInfoMessageStyle.Println(project)
 					ptermScopeStyle.Println(branchName.Name().Short())
@@ -166,16 +157,10 @@ func runFix(cmd *cobra.Command, args []string) error {
 					return
 				}
 
-				// find first still active path
-				for it := activeRepoPaths.Iterator(); it.HasNext(); {
-					node, _ := it.Next()
-					repoPath := string(node.Key())
+				// update active
+				activeRepoPaths = lo.Without(activeRepoPaths, repoPath)
 
-					config.Checkpoint = repoPath
-					break
-				}
-
-				activeRepoPaths.Delete(art.Key(repoPath))
+				config.Paths = activeRepoPaths
 
 				if err := saveCheckpointConfigState(baseDir, fixCmdName, config, i); err != nil {
 					ptermErrorMessageStyle.Println(err.Error())
@@ -208,7 +193,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 		Println(fmt.Sprintf("took %s", time.Since(startedAt).Round(time.Millisecond).String()))
 
 	// in order to clear configuration file
-	config.Checkpoint = ""
+	config.Paths = nil
 
 	return nil
 }
