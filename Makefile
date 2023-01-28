@@ -52,7 +52,6 @@ build-deps: ## Install builder dependencies
 tidy:
 	@echo "--> Tidy module"
 	@go mod tidy
-	@go mod download all
 
 .PHONY: check
 check: ## Lint the source code
