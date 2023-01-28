@@ -1,27 +1,15 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"os"
-	"sync"
 
-	"github.com/go-git/go-billy/v5/osfs"
+	"github.com/zbiljic/fget/pkg/vconfig"
 )
 
-const (
-	configStateVersion            = "1"
-	configStateFileFormat         = ".fget.state-%s.json"
-	configStateCheckpointInterval = 100
-)
+const configStateVersionV1 = "1"
 
-var (
-	// cached during usage
-	cacheConfigStateV1 *configStateV1
-	// all access to state configuration file should be synchronized
-	configStateMutex = &sync.RWMutex{}
-)
+// cached during usage
+var cacheConfigStateV1 *configStateV1
 
 type configStateV1 struct {
 	Version    string   `json:"version"`
@@ -32,7 +20,7 @@ type configStateV1 struct {
 // newConfigStateV1 - new state config.
 func newConfigStateV1() *configStateV1 {
 	config := new(configStateV1)
-	config.Version = configStateVersion
+	config.Version = configStateVersionV1
 	config.Roots = make([]string, 0)
 	return config
 }
@@ -47,26 +35,9 @@ func loadConfigStateV1(baseDir, stateName string) (*configStateV1, error) {
 		return cacheConfigStateV1, nil
 	}
 
-	fs := osfs.New(baseDir)
-	configStateFile := fmt.Sprintf(configStateFileFormat, stateName)
+	filename := configStateFilename(baseDir, stateName)
 
-	if _, err := fs.Stat(configStateFile); err != nil {
-		return nil, err
-	}
-
-	f, err := fs.Open(configStateFile)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-
-	config := &configStateV1{}
-
-	err = json.Unmarshal(data, config)
+	config, err := vconfig.LoadConfig[configStateV1](filename)
 	if err != nil {
 		return nil, err
 	}
@@ -83,30 +54,14 @@ func saveConfigStateV1(baseDir, stateName string, config *configStateV1) error {
 	configStateMutex.Lock()
 	defer configStateMutex.Unlock()
 
-	data, err := json.MarshalIndent(config, "", "\t")
-	if err != nil {
+	filename := configStateFilename(baseDir, stateName)
+
+	if err := vconfig.SaveConfig(config, filename); err != nil {
 		return err
 	}
 
 	// update the cache
 	cacheConfigStateV1 = config
-
-	fs := osfs.New(baseDir)
-	configStateFile := fmt.Sprintf(configStateFileFormat, stateName)
-
-	f, err := fs.Create(configStateFile)
-	if err != nil {
-		return err
-	}
-
-	n, err := f.Write(data)
-	if err == nil && n < len(data) {
-		return io.ErrShortWrite
-	}
-
-	if err := f.Close(); err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -118,10 +73,9 @@ func clearConfigStateV1(baseDir, stateName string) error {
 	// clear cached
 	cacheConfigStateV1 = nil
 
-	fs := osfs.New(baseDir)
-	configStateFile := fmt.Sprintf(configStateFileFormat, stateName)
+	filename := configStateFilename(baseDir, stateName)
 
-	if _, err := fs.Stat(configStateFile); err != nil {
+	if _, err := os.Stat(filename); err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
@@ -129,7 +83,7 @@ func clearConfigStateV1(baseDir, stateName string) error {
 		return err
 	}
 
-	if err := fs.Remove(configStateFile); err != nil {
+	if err := os.Remove(filename); err != nil {
 		return err
 	}
 

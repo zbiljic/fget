@@ -7,7 +7,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
-	github.com/go-git/go-billy/v5 v5.4.0
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.2
 	github.com/imdario/mergo v0.3.13
@@ -29,6 +28,7 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
+	github.com/go-git/go-billy/v5 v5.4.0 // indirect
 	github.com/gookit/color v1.5.2 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
