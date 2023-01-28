@@ -6,6 +6,7 @@ require (
 	github.com/alitto/pond v1.8.2
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/coreos/go-semver v0.3.1
+	github.com/fatih/structs v1.1.0
 	github.com/go-git/go-billy/v5 v5.4.0
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.2
