@@ -190,7 +190,10 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 	pterm.Println()
 	ptermSuccessWithPrefixText(fixCmdName).
-		Println(fmt.Sprintf("took %s", time.Since(startedAt).Round(time.Millisecond).String()))
+		Printfln("took %s (total: %s)",
+			time.Since(startedAt).Round(time.Millisecond).String(),
+			time.Since(config.CreateTime).Round(time.Millisecond).String(),
+		)
 
 	// in order to clear configuration file
 	config.Paths = nil
