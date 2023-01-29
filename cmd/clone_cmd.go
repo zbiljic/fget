@@ -62,7 +62,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 		repoPath := filepath.Join(opts.RootDirectory, projectID)
 
 		pterm.Println(repoPath)
-		pterm.Println(projectID)
+		ptermInfoMessageStyle.Println(projectID)
 
 		// clone
 		startedAt := time.Now()
