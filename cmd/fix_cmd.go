@@ -17,10 +17,8 @@ import (
 	"github.com/zbiljic/fget/pkg/fsfind"
 )
 
-const fixCmdName = "fix"
-
 var fixCmd = &cobra.Command{
-	Use:         fixCmdName,
+	Use:         "fix",
 	Short:       "Fixes inconsistencies found in the local repository",
 	Annotations: map[string]string{"group": "update"},
 	Args:        cobra.ArbitraryArgs,
@@ -43,6 +41,8 @@ type fixOptions struct {
 }
 
 func runFix(cmd *cobra.Command, args []string) error {
+	cmdName := cmd.Name()
+
 	opts, err := parseFixArgs(args)
 	if err != nil {
 		return err
@@ -55,13 +55,13 @@ func runFix(cmd *cobra.Command, args []string) error {
 	// for configuration
 	baseDir := opts.Roots[0]
 
-	config, err := loadOrCreateConfigState(baseDir, fixCmdName, opts.Roots...)
+	config, err := loadOrCreateConfigState(baseDir, cmdName, opts.Roots...)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		if err := finishConfigState(baseDir, fixCmdName, config); err != nil {
+		if err := finishConfigState(baseDir, cmdName, config); err != nil {
 			ptermErrorMessageStyle.Println(err.Error())
 		}
 	}()
@@ -87,7 +87,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 			return true
 		})
 
-		if err := saveConfigState(baseDir, fixCmdName, config); err != nil {
+		if err := saveConfigState(baseDir, cmdName, config); err != nil {
 			return err
 		}
 
@@ -161,7 +161,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 				config.Paths = activeRepoPaths
 
-				if err := saveCheckpointConfigState(baseDir, fixCmdName, config, i); err != nil {
+				if err := saveCheckpointConfigState(baseDir, cmdName, config, i); err != nil {
 					ptermErrorMessageStyle.Println(err.Error())
 				}
 			}()
@@ -176,7 +176,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 			if err := gitRunFix(ctx, repoPath); err != nil {
 				errored.Set()
 				printErrorFn(err)
-				return fmt.Errorf("%s '%s': %w", fixCmdName, repoPath, err)
+				return fmt.Errorf("%s '%s': %w", cmdName, repoPath, err)
 			}
 
 			return nil
@@ -188,7 +188,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 	}
 
 	pterm.Println()
-	ptermSuccessWithPrefixText(fixCmdName).
+	ptermSuccessWithPrefixText(cmdName).
 		Printfln("took %s (total: %s)",
 			time.Since(startedAt).Round(time.Millisecond).String(),
 			time.Since(config.CreateTime).Round(time.Millisecond).String(),

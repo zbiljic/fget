@@ -17,10 +17,8 @@ import (
 	"github.com/zbiljic/fget/pkg/fsfind"
 )
 
-const updateCmdName = "update"
-
 var updateCmd = &cobra.Command{
-	Use:         updateCmdName,
+	Use:         "update",
 	Aliases:     []string{"up"},
 	Short:       "Fetch changes from a remote repository into the current branch",
 	Annotations: map[string]string{"group": "update"},
@@ -44,6 +42,8 @@ type updateOptions struct {
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
+	cmdName := cmd.Name()
+
 	opts, err := parseUpdateArgs(args)
 	if err != nil {
 		return err
@@ -56,13 +56,13 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// for configuration
 	baseDir := opts.Roots[0]
 
-	config, err := loadOrCreateConfigState(baseDir, updateCmdName, opts.Roots...)
+	config, err := loadOrCreateConfigState(baseDir, cmdName, opts.Roots...)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		if err := finishConfigState(baseDir, updateCmdName, config); err != nil {
+		if err := finishConfigState(baseDir, cmdName, config); err != nil {
 			ptermErrorMessageStyle.Println(err.Error())
 		}
 	}()
@@ -88,7 +88,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			return true
 		})
 
-		if err := saveConfigState(baseDir, updateCmdName, config); err != nil {
+		if err := saveConfigState(baseDir, cmdName, config); err != nil {
 			return err
 		}
 
@@ -162,7 +162,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 				config.Paths = activeRepoPaths
 
-				if err := saveCheckpointConfigState(baseDir, updateCmdName, config, i); err != nil {
+				if err := saveCheckpointConfigState(baseDir, cmdName, config, i); err != nil {
 					ptermErrorMessageStyle.Println(err.Error())
 				}
 			}()
@@ -177,7 +177,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			if err := gitRunUpdate(ctx, repoPath); err != nil {
 				errored.Set()
 				printErrorFn(err)
-				return fmt.Errorf("%s '%s': %w", updateCmdName, repoPath, err)
+				return fmt.Errorf("%s '%s': %w", cmdName, repoPath, err)
 			}
 
 			return nil
@@ -189,7 +189,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	pterm.Println()
-	ptermSuccessWithPrefixText(updateCmdName).
+	ptermSuccessWithPrefixText(cmdName).
 		Printfln("took %s (total: %s)",
 			time.Since(startedAt).Round(time.Millisecond).String(),
 			time.Since(config.CreateTime).Round(time.Millisecond).String(),
