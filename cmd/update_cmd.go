@@ -32,13 +32,15 @@ var pullCmdFlags = &updateOptions{}
 
 func init() {
 	updateCmd.Flags().BoolVar(&pullCmdFlags.DryRun, "dry-run", false, "Displays the operations that would be performed using the specified command without actually running them")
+	updateCmd.Flags().Uint16VarP(&pullCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
 
 	rootCmd.AddCommand(updateCmd)
 }
 
 type updateOptions struct {
-	Roots  []string
-	DryRun bool
+	Roots      []string
+	DryRun     bool
+	MaxWorkers uint16
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
@@ -103,7 +105,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	startOffset := 1 + config.TotalCount - len(activeRepoPaths)
 
 	// worker pool
-	pool := pond.New(poolDefaultMaxWorkers, poolDefaultMaxCapacity)
+	pool := pond.New(int(opts.MaxWorkers), poolDefaultMaxCapacity)
 	defer pool.StopAndWait()
 
 	// task group associated to a context
