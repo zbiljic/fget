@@ -80,16 +80,13 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 		config.TotalCount = repoPaths.Size()
 
-		// only save if more than one repository
-		if config.TotalCount > 1 {
-			repoPaths.ForEach(func(node art.Node) bool {
-				config.Paths = append(config.Paths, string(node.Key()))
-				return true
-			})
+		repoPaths.ForEach(func(node art.Node) bool {
+			config.Paths = append(config.Paths, string(node.Key()))
+			return true
+		})
 
-			if err := saveConfigState(baseDir, updateCmdName, config); err != nil {
-				return err
-			}
+		if err := saveConfigState(baseDir, fixCmdName, config); err != nil {
+			return err
 		}
 
 		spinner.Stop() //nolint:errcheck

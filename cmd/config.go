@@ -1,6 +1,11 @@
 package cmd
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+
+	"golang.org/x/exp/slices"
+)
 
 func createConfigState(roots ...string) (*configStateV2, error) {
 	config := newConfigStateV2()
@@ -13,6 +18,28 @@ func loadOrCreateConfigState(baseDir, stateName string, roots ...string) (*confi
 }
 
 func saveConfigState(baseDir, stateName string, config *configStateV2) error {
+	// skip saving config state for single repository
+	if len(config.Roots) == len(config.Paths) {
+		// fast path
+		if slices.Equal(config.Roots, config.Paths) {
+			return nil
+		}
+
+		// slow path
+		roots := make([]string, len(config.Roots))
+		paths := make([]string, len(config.Paths))
+
+		copy(roots, config.Roots)
+		copy(paths, config.Paths)
+
+		sort.Strings(roots)
+		sort.Strings(paths)
+
+		if slices.Equal(roots, paths) {
+			return nil
+		}
+	}
+
 	if err := saveConfigStateV2(baseDir, stateName, config); err != nil {
 		return fmt.Errorf("save config state: %w", err)
 	}

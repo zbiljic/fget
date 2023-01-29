@@ -17,6 +17,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
+	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17
 )
 
 require (
@@ -45,7 +46,6 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
 	golang.org/x/crypto v0.3.0 // indirect
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/net v0.2.0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/term v0.2.0 // indirect
