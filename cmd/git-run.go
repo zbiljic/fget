@@ -38,3 +38,17 @@ func gitRunUpdate(ctx context.Context, repoPath string) error {
 
 	return nil
 }
+
+func gitRunGc(ctx context.Context, repoPath string) error {
+	if count, err := gitPackObjectsCount(ctx, repoPath); err != nil {
+		return err
+	} else if count <= 1 {
+		return nil
+	}
+
+	if err := gitGc(ctx, repoPath); err != nil {
+		return err
+	}
+
+	return nil
+}

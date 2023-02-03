@@ -23,6 +23,7 @@ import (
 	"github.com/tevino/abool/v2"
 	giturls "github.com/whilp/git-urls"
 
+	"github.com/zbiljic/fget/pkg/fsfind"
 	"github.com/zbiljic/fget/pkg/gitexec"
 	"github.com/zbiljic/fget/pkg/rhttp"
 )
@@ -757,4 +758,77 @@ func gitRepoPull(repo *git.Repository) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func gitPackObjectsCount(ctx context.Context, repoPath string) (int, error) {
+	objects, err := fsfind.GitObjects(repoPath)
+	if err != nil {
+		return 0, fmt.Errorf("objects count: %w", err)
+	}
+
+	return len(objects), nil
+}
+
+func gitGc(ctx context.Context, repoPath string) error {
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	// print info if executing
+	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
+		printProjectInfoHeaderFn()
+	}
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermInfoWithPrefixText("gc")
+
+	prefixPrinter.Print()
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	out, err := gitRepoPathGc(repoPath)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	if len(out) > 0 {
+		pterm.Println()
+		pterm.Println(string(out))
+	}
+
+	return nil
+}
+
+func gitRepoPathGc(repoPath string) ([]byte, error) {
+	out, err := gitexec.Gc(&gitexec.GcOptions{
+		CmdDir: repoPath,
+		Prune:  "all",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
