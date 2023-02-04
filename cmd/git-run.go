@@ -36,6 +36,10 @@ func gitRunUpdate(ctx context.Context, repoPath string) error {
 		return err
 	}
 
+	if err := gitRunGc(ctx, repoPath); err != nil {
+		return err
+	}
+
 	return nil
 }
 
