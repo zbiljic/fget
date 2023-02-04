@@ -18,6 +18,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	pthttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pterm/pterm"
@@ -586,6 +587,13 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 				// Don't retry if the error was due to TLS cert verification failure.
 				if _, ok := v.Err.(x509.HostnameError); ok {
 					return nil
+				}
+			case *plumbing.UnexpectedError:
+				if pthttpErr, ok := v.Err.(*pthttp.Err); ok {
+					// don't retry on server errors
+					if pthttpErr.Response.StatusCode >= http.StatusInternalServerError {
+						return nil
+					}
 				}
 			default:
 			}
