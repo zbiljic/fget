@@ -573,6 +573,9 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 			}
 			// retry
 		case errors.Is(err, storage.ErrReferenceHasChanged):
+			if err1 := gitFixReferences(ctx, repoPath); err1 != nil {
+				return err
+			}
 			// retry
 		case errors.Is(err, git.NoErrAlreadyUpToDate):
 			return err
