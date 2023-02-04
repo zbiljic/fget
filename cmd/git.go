@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/http"
@@ -580,6 +581,15 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 		case errors.Is(err, git.NoErrAlreadyUpToDate):
 			return err
 		default:
+			switch v := err.(type) {
+			case *url.Error:
+				// Don't retry if the error was due to TLS cert verification failure.
+				if _, ok := v.Err.(x509.HostnameError); ok {
+					return nil
+				}
+			default:
+			}
+
 			return err
 		}
 
