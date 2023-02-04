@@ -22,7 +22,7 @@ const (
 
 const (
 	// Default retry configuration
-	defaultRetryWaitMin        = 1 * time.Second
-	defaultRetryWaitMax        = 30 * time.Second
+	defaultRetryWaitMin        = time.Second
+	defaultRetryWaitMax        = 10 * time.Second
 	defaultRetryMaxElapsedTime = time.Minute
 )
