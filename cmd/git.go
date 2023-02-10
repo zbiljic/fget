@@ -578,7 +578,8 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 			if err1 := gitFixReferences(ctx, repoPath); err1 != nil {
 				return err
 			}
-			// retry
+			// NOTE: skip backoff, fast retry
+			continue
 		case errors.Is(err, git.NoErrAlreadyUpToDate):
 			return err
 		default:
