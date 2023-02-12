@@ -317,10 +317,10 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 		defer updateMutex.Unlock()
 	}
 
-	printProjectInfoContext(ctx)
-
 	// NOTE: delayed error check
 	if err != nil {
+		printProjectInfoContext(ctx)
+
 		if errors.Is(err, ErrGitMissingRemoteHeadReference) {
 			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			return nil
@@ -362,6 +362,8 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 	}
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	printProjectInfoContext(ctx)
 
 	prefixPrinter.Printf("'%s'", remoteHeadBranchName)
 	pterm.Print(": ")
@@ -653,10 +655,10 @@ func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
 		defer updateMutex.Unlock()
 	}
 
-	printProjectInfoContext(ctx)
-
 	// NOTE: delayed error check
 	if err != nil {
+		printProjectInfoContext(ctx)
+
 		if errors.Is(err, ErrGitMissingRemoteHeadReference) {
 			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			return false, nil
@@ -682,8 +684,14 @@ func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
 		return false, nil
 	}
 
+	onlyUpdated, _ := ctx.Value(ctxKeyOnlyUpdated{}).(bool)
+
 	if headRef.Hash() == remoteHeadRef.Hash() {
-		prefixPrinter.Println("up-to-date")
+		if !onlyUpdated {
+			printProjectInfoContext(ctx)
+			prefixPrinter.Println("up-to-date")
+		}
+
 		return true, nil
 	}
 

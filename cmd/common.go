@@ -10,6 +10,7 @@ var updateMutex = &sync.RWMutex{}
 
 type (
 	ctxKeyDryRun                   struct{}
+	ctxKeyOnlyUpdated              struct{}
 	ctxKeyPrintProjectInfoHeaderFn struct{}
 	ctxKeyIsUpdateMutexLocked      struct{}
 	ctxKeyShouldUpdateMutexUnlock  struct{}

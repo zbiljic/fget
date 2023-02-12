@@ -59,10 +59,15 @@ func taskUpdateFn(
 		}
 		defer updateMutex.Unlock()
 
-		printProjectInfoHeaderFn()
+		onlyUpdated, _ := ctx.Value(ctxKeyOnlyUpdated{}).(bool)
+
+		if !onlyUpdated {
+			printProjectInfoContext(ctx)
+		}
 
 		// NOTE: delayed error check
 		if err != nil {
+			printProjectInfoContext(ctx)
 			ptermErrorMessageStyle.Println(err.Error())
 			err = fmt.Errorf("%s '%s': %w", cmdName, repoPath, err)
 		}

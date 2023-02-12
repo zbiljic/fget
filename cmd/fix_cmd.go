@@ -28,15 +28,17 @@ func init() {
 	fixCmd.Flags().BoolVar(&fixCmdFlags.DryRun, "dry-run", false, "Displays the operations that would be performed using the specified command without actually running them")
 	fixCmd.Flags().Uint16VarP(&fixCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
 	fixCmd.Flags().BoolVarP(&fixCmdFlags.NoErrors, "no-errors", "s", false, "Suppress some errors")
+	fixCmd.Flags().BoolVarP(&fixCmdFlags.OnlyUpdated, "only-updated", "u", false, "Print only updated projects")
 
 	rootCmd.AddCommand(fixCmd)
 }
 
 type fixOptions struct {
-	Roots      []string
-	DryRun     bool
-	MaxWorkers uint16
-	NoErrors   bool
+	Roots       []string
+	DryRun      bool
+	MaxWorkers  uint16
+	NoErrors    bool
+	OnlyUpdated bool
 }
 
 func runFix(cmd *cobra.Command, args []string) error {
@@ -138,6 +140,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 		// context setup
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
+		ctx = context.WithValue(ctx, ctxKeyOnlyUpdated{}, opts.OnlyUpdated)
 
 		task := taskUpdateFn(
 			ctx,
