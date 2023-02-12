@@ -27,6 +27,7 @@ var fixCmdFlags = &fixOptions{}
 func init() {
 	fixCmd.Flags().BoolVar(&fixCmdFlags.DryRun, "dry-run", false, "Displays the operations that would be performed using the specified command without actually running them")
 	fixCmd.Flags().Uint16VarP(&fixCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
+	fixCmd.Flags().BoolVarP(&fixCmdFlags.NoErrors, "no-errors", "s", false, "Suppress some errors")
 
 	rootCmd.AddCommand(fixCmd)
 }
@@ -35,6 +36,7 @@ type fixOptions struct {
 	Roots      []string
 	DryRun     bool
 	MaxWorkers uint16
+	NoErrors   bool
 }
 
 func runFix(cmd *cobra.Command, args []string) error {
@@ -98,6 +100,9 @@ func runFix(cmd *cobra.Command, args []string) error {
 
 	cleanupFn := func(repoPath string, index int, err error) error {
 		if err != nil {
+			if opts.NoErrors {
+				return nil
+			}
 			return err
 		}
 

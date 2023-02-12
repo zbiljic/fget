@@ -27,6 +27,7 @@ var gcCmdFlags = &gcOptions{}
 func init() {
 	gcCmd.Flags().BoolVar(&gcCmdFlags.DryRun, "dry-run", false, "Displays the operations that would be performed using the specified command without actually running them")
 	gcCmd.Flags().Uint16VarP(&gcCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
+	gcCmd.Flags().BoolVarP(&gcCmdFlags.NoErrors, "no-errors", "s", false, "Suppress some errors")
 
 	rootCmd.AddCommand(gcCmd)
 }
@@ -35,6 +36,7 @@ type gcOptions struct {
 	Roots      []string
 	DryRun     bool
 	MaxWorkers uint16
+	NoErrors   bool
 }
 
 func runGc(cmd *cobra.Command, args []string) error {
@@ -98,6 +100,9 @@ func runGc(cmd *cobra.Command, args []string) error {
 
 	cleanupFn := func(repoPath string, index int, err error) error {
 		if err != nil {
+			if opts.NoErrors {
+				return nil
+			}
 			return err
 		}
 

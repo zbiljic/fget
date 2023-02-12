@@ -28,6 +28,7 @@ var pullCmdFlags = &updateOptions{}
 func init() {
 	updateCmd.Flags().BoolVar(&pullCmdFlags.DryRun, "dry-run", false, "Displays the operations that would be performed using the specified command without actually running them")
 	updateCmd.Flags().Uint16VarP(&pullCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
+	updateCmd.Flags().BoolVarP(&pullCmdFlags.NoErrors, "no-errors", "s", false, "Suppress some errors")
 
 	rootCmd.AddCommand(updateCmd)
 }
@@ -36,6 +37,7 @@ type updateOptions struct {
 	Roots      []string
 	DryRun     bool
 	MaxWorkers uint16
+	NoErrors   bool
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
@@ -99,6 +101,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	cleanupFn := func(repoPath string, index int, err error) error {
 		if err != nil {
+			if opts.NoErrors {
+				return nil
+			}
 			return err
 		}
 
