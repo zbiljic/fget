@@ -9,6 +9,12 @@ import (
 	"github.com/tevino/abool/v2"
 )
 
+func printProjectInfoContext(ctx context.Context) {
+	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
+		printProjectInfoHeaderFn()
+	}
+}
+
 func taskUpdateFn(
 	ctx context.Context,
 	cmdName string,

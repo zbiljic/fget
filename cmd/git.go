@@ -166,10 +166,7 @@ func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.R
 		defer updateMutex.Unlock()
 	}
 
-	// print info if executing
-	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
-		printProjectInfoHeaderFn()
-	}
+	printProjectInfoContext(ctx)
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
@@ -227,10 +224,7 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 		defer updateMutex.Unlock()
 	}
 
-	// print info if executing
-	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
-		printProjectInfoHeaderFn()
-	}
+	printProjectInfoContext(ctx)
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
@@ -323,10 +317,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 		defer updateMutex.Unlock()
 	}
 
-	// print info if executing
-	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
-		printProjectInfoHeaderFn()
-	}
+	printProjectInfoContext(ctx)
 
 	// NOTE: delayed error check
 	if err != nil {
@@ -662,10 +653,7 @@ func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
 		defer updateMutex.Unlock()
 	}
 
-	// print info if executing
-	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
-		printProjectInfoHeaderFn()
-	}
+	printProjectInfoContext(ctx)
 
 	// NOTE: delayed error check
 	if err != nil {
@@ -722,10 +710,7 @@ func gitPull(ctx context.Context, repoPath string) error {
 		defer updateMutex.Unlock()
 	}
 
-	// print info if executing
-	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
-		printProjectInfoHeaderFn()
-	}
+	printProjectInfoContext(ctx)
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
@@ -811,10 +796,7 @@ func gitGc(ctx context.Context, repoPath string) error {
 		defer updateMutex.Unlock()
 	}
 
-	// print info if executing
-	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
-		printProjectInfoHeaderFn()
-	}
+	printProjectInfoContext(ctx)
 
 	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
 
