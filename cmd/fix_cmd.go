@@ -29,6 +29,7 @@ func init() {
 	fixCmd.Flags().Uint16VarP(&fixCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
 	fixCmd.Flags().BoolVarP(&fixCmdFlags.NoErrors, "no-errors", "s", false, "Suppress some errors")
 	fixCmd.Flags().BoolVarP(&fixCmdFlags.OnlyUpdated, "only-updated", "u", false, "Print only updated projects")
+	fixCmd.Flags().DurationVar(&fixCmdFlags.ExecTimeout, "exec-timeout", 0, "Duration after which process should stop")
 
 	rootCmd.AddCommand(fixCmd)
 }
@@ -39,6 +40,7 @@ type fixOptions struct {
 	MaxWorkers  uint16
 	NoErrors    bool
 	OnlyUpdated bool
+	ExecTimeout time.Duration
 }
 
 func runFix(cmd *cobra.Command, args []string) error {
@@ -129,8 +131,17 @@ func runFix(cmd *cobra.Command, args []string) error {
 	pool := pond.New(int(opts.MaxWorkers), poolDefaultMaxCapacity)
 	defer pool.StopAndWait()
 
+	ctx := context.Background()
+
+	if opts.ExecTimeout > 0 {
+		var ctxCancelFn context.CancelFunc
+
+		ctx, ctxCancelFn = context.WithTimeout(ctx, opts.ExecTimeout)
+		defer ctxCancelFn()
+	}
+
 	// task group associated to a context
-	group, _ := pool.GroupContext(context.Background())
+	group, ctx := pool.GroupContext(ctx)
 
 	for i, path := range config.Paths {
 		i := i + startOffset
@@ -138,7 +149,6 @@ func runFix(cmd *cobra.Command, args []string) error {
 		repoPath := path
 
 		// context setup
-		ctx := context.Background()
 		ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
 		ctx = context.WithValue(ctx, ctxKeyOnlyUpdated{}, opts.OnlyUpdated)
 

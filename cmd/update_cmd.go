@@ -30,6 +30,7 @@ func init() {
 	updateCmd.Flags().Uint16VarP(&pullCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
 	updateCmd.Flags().BoolVarP(&pullCmdFlags.NoErrors, "no-errors", "s", false, "Suppress some errors")
 	updateCmd.Flags().BoolVarP(&pullCmdFlags.OnlyUpdated, "only-updated", "u", false, "Print only updated projects")
+	updateCmd.Flags().DurationVar(&pullCmdFlags.ExecTimeout, "exec-timeout", 0, "Duration after which process should stop")
 
 	rootCmd.AddCommand(updateCmd)
 }
@@ -40,6 +41,7 @@ type updateOptions struct {
 	MaxWorkers  uint16
 	NoErrors    bool
 	OnlyUpdated bool
+	ExecTimeout time.Duration
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
@@ -130,8 +132,17 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	pool := pond.New(int(opts.MaxWorkers), poolDefaultMaxCapacity)
 	defer pool.StopAndWait()
 
+	ctx := context.Background()
+
+	if opts.ExecTimeout > 0 {
+		var ctxCancelFn context.CancelFunc
+
+		ctx, ctxCancelFn = context.WithTimeout(ctx, opts.ExecTimeout)
+		defer ctxCancelFn()
+	}
+
 	// task group associated to a context
-	group, _ := pool.GroupContext(context.Background())
+	group, ctx := pool.GroupContext(ctx)
 
 	for i, path := range config.Paths {
 		i := i + startOffset
@@ -139,7 +150,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		repoPath := path
 
 		// context setup
-		ctx := context.Background()
 		ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
 		ctx = context.WithValue(ctx, ctxKeyOnlyUpdated{}, opts.OnlyUpdated)
 
