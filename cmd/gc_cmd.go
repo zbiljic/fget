@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/alitto/pond"
@@ -12,7 +10,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
-	"github.com/tevino/abool/v2"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
 )
@@ -42,6 +39,7 @@ type gcOptions struct {
 
 func runGc(cmd *cobra.Command, args []string) error {
 	cmdName := cmd.Name()
+	runFn := gitRunGc
 
 	opts, err := parseGcArgs(args)
 	if err != nil {
@@ -98,6 +96,23 @@ func runGc(cmd *cobra.Command, args []string) error {
 	activeRepoPaths := make([]string, len(config.Paths))
 	copy(activeRepoPaths, config.Paths)
 
+	cleanupFn := func(repoPath string, index int, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// update active
+		activeRepoPaths = lo.Without(activeRepoPaths, repoPath)
+
+		config.Paths = activeRepoPaths
+
+		if err := saveCheckpointConfigState(baseDir, cmdName, config, index); err != nil {
+			ptermErrorMessageStyle.Println(err.Error())
+		}
+
+		return nil
+	}
+
 	// start
 	startedAt := time.Now()
 
@@ -115,72 +130,21 @@ func runGc(cmd *cobra.Command, args []string) error {
 
 		repoPath := path
 
-		group.Submit(func() error {
-			var (
-				printProjectInfoHeaderOnce sync.Once
-				isUpdateMutexLocked        = abool.New()
-				errored                    = abool.New()
-			)
+		// context setup
+		ctx := context.Background()
+		ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
 
-			printProjectInfoHeaderFn := func() {
-				printProjectInfoHeaderOnce.Do(func() {
-					project, branchName, err := gitProjectInfo(repoPath)
-					if err != nil {
-						ptermErrorMessageStyle.Println(err.Error())
-						return
-					}
+		task := taskUpdateFn(
+			ctx,
+			cmdName,
+			config,
+			i,
+			repoPath,
+			runFn,
+			cleanupFn,
+		)
 
-					pterm.Println()
-					pterm.Printfln("[%d/%d] (active: %d)", i, config.TotalCount, len(activeRepoPaths))
-					pterm.Println(repoPath)
-					ptermInfoMessageStyle.Println(project)
-					ptermScopeStyle.Println(branchName.Name().Short())
-				})
-			}
-
-			printErrorFn := func(err error) {
-				printProjectInfoHeaderFn()
-				ptermErrorMessageStyle.Println(err.Error())
-			}
-
-			// cleanup
-			defer func() {
-				if isUpdateMutexLocked.IsNotSet() {
-					updateMutex.Lock()
-				}
-				defer updateMutex.Unlock()
-
-				printProjectInfoHeaderFn()
-
-				if errored.IsSet() {
-					return
-				}
-
-				// update active
-				activeRepoPaths = lo.Without(activeRepoPaths, repoPath)
-
-				config.Paths = activeRepoPaths
-
-				if err := saveCheckpointConfigState(baseDir, cmdName, config, i); err != nil {
-					ptermErrorMessageStyle.Println(err.Error())
-				}
-			}()
-
-			// context setup
-			ctx := context.Background()
-			ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
-			ctx = context.WithValue(ctx, ctxKeyPrintProjectInfoHeaderFn{}, printProjectInfoHeaderFn)
-			ctx = context.WithValue(ctx, ctxKeyIsUpdateMutexLocked{}, isUpdateMutexLocked)
-			ctx = context.WithValue(ctx, ctxKeyShouldUpdateMutexUnlock{}, false)
-
-			if err := gitRunGc(ctx, repoPath); err != nil {
-				errored.Set()
-				printErrorFn(err)
-				return fmt.Errorf("%s '%s': %w", cmdName, repoPath, err)
-			}
-
-			return nil
-		})
+		group.Submit(task)
 	}
 
 	if err := group.Wait(); err != nil {
