@@ -384,6 +384,91 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 	return nil
 }
 
+func gitResetDefaultBranch(ctx context.Context, repoPath string) error {
+	_, headRef, err := gitProjectInfo(repoPath)
+	if err != nil {
+		return err
+	}
+
+	prefixPrinter := ptermWarningWithPrefixText("reset HEAD")
+
+	remoteHeadRef, err := gitFindRemoteHeadReference(ctx, repoPath)
+	// NOTE: error check comes after lock
+
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	// NOTE: delayed error check
+	if err != nil {
+		printProjectInfoContext(ctx)
+
+		if errors.Is(err, ErrGitMissingRemoteHeadReference) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return nil
+		}
+
+		if errors.Is(err, ErrGitRepositoryNotReachable) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return nil
+		}
+
+		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
+			var urlError *url.Error
+			if errors.As(err, &urlError) {
+				prefixPrinter.Printfln("moved: %s", urlError.URL)
+			} else {
+				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			}
+			return nil
+		}
+
+		// NOTE: ignore all errors here
+		prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+		return nil
+	}
+
+	if headRef.Hash() == remoteHeadRef.Hash() {
+		return nil
+	}
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	printProjectInfoContext(ctx)
+
+	prefixPrinter.Printf("'%s'", headRef.Name().Short())
+	pterm.Print(": ")
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	if err := gitReset(ctx, repoPath, remoteHeadRef.Hash()); err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return nil
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	return nil
+}
+
 func gitCheckRemoteURL(ctx context.Context, repoPath string) (bool, error) {
 	remoteURL, err := gitRemoteConfigURL(repoPath)
 	if err != nil {
@@ -559,7 +644,7 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 		case errors.Is(err, transport.ErrAuthenticationRequired):
 			return nil
 		case errors.Is(err, git.ErrNonFastForwardUpdate):
-			if err1 := gitUpdateDefaultBranch(ctx, repoPath); err1 != nil {
+			if err1 := gitResetDefaultBranch(ctx, repoPath); err1 != nil {
 				return err
 			}
 			// retry

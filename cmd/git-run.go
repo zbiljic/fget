@@ -20,6 +20,10 @@ func gitRunFix(ctx context.Context, repoPath string) error {
 		return err
 	}
 
+	if err := gitResetDefaultBranch(ctx, repoPath); err != nil {
+		return err
+	}
+
 	return nil
 }
 
