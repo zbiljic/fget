@@ -237,7 +237,7 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 		return nil
 	}
 
-	if err := gitReset(ctx, repoPath); err != nil {
+	if err := gitReset(ctx, repoPath, plumbing.ZeroHash); err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
 		return nil
 	}
@@ -266,7 +266,7 @@ func gitIsClean(ctx context.Context, repoPath string) (bool, error) {
 	return status.IsClean(), nil
 }
 
-func gitReset(ctx context.Context, repoPath string) error {
+func gitReset(ctx context.Context, repoPath string, commit plumbing.Hash) error {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return err
@@ -278,7 +278,8 @@ func gitReset(ctx context.Context, repoPath string) error {
 	}
 
 	err = worktree.Reset(&git.ResetOptions{
-		Mode: git.HardReset,
+		Commit: commit,
+		Mode:   git.HardReset,
 	})
 	if err != nil {
 		return err
