@@ -34,6 +34,7 @@ func taskUpdateFn(
 			printProjectInfoHeaderOnce.Do(func() {
 				project, branchName, err := gitProjectInfo(repoPath)
 				if err != nil {
+					err = fmt.Errorf("'%s': %w", repoPath, err)
 					ptermErrorMessageStyle.Println(err.Error())
 					return
 				}
