@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/pterm/pterm"
 	"github.com/tevino/abool/v2"
 )
@@ -68,6 +70,11 @@ func taskUpdateFn(
 
 		// NOTE: delayed error check
 		if err != nil {
+			// skip missing repositories
+			if errors.Is(err, git.ErrRepositoryNotExists) {
+				return cleanupFn(repoPath, index, nil)
+			}
+
 			printProjectInfoContext(ctx)
 			ptermErrorMessageStyle.Println(err.Error())
 			err = fmt.Errorf("%s '%s': %w", cmdName, repoPath, err)
