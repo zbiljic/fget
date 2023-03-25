@@ -13,7 +13,7 @@ require (
 	github.com/mattn/go-isatty v0.0.18
 	github.com/plar/go-adaptive-radix-tree v1.0.5
 	github.com/pterm/pterm v0.12.56
-	github.com/samber/lo v1.37.0
+	github.com/samber/lo v1.38.1
 	github.com/spf13/cobra v1.6.1
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
