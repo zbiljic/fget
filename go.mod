@@ -10,7 +10,7 @@ require (
 	github.com/go-git/go-git/v5 v5.7.0
 	github.com/hashicorp/go-retryablehttp v0.7.2
 	github.com/imdario/mergo v0.3.15
-	github.com/mattn/go-isatty v0.0.18
+	github.com/mattn/go-isatty v0.0.19
 	github.com/plar/go-adaptive-radix-tree v1.0.5
 	github.com/pterm/pterm v0.12.61
 	github.com/samber/lo v1.38.1
