@@ -12,7 +12,7 @@ require (
 	github.com/imdario/mergo v0.3.16
 	github.com/mattn/go-isatty v0.0.19
 	github.com/plar/go-adaptive-radix-tree v1.0.5
-	github.com/pterm/pterm v0.12.61
+	github.com/pterm/pterm v0.12.62
 	github.com/samber/lo v1.38.1
 	github.com/spf13/cobra v1.7.0
 	github.com/tevino/abool/v2 v2.1.0
@@ -38,7 +38,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/lithammer/fuzzysearch v1.1.7 // indirect
+	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
