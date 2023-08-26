@@ -12,6 +12,10 @@ func gitRunFix(ctx context.Context, repoPath string) error {
 		return err
 	}
 
+	if err := gitFixObjectNotFound(ctx, repoPath); err != nil {
+		return err
+	}
+
 	if err := gitMakeClean(ctx, repoPath); err != nil {
 		return err
 	}

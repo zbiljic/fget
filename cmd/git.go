@@ -195,6 +195,29 @@ func gitRemoveReference(ctx context.Context, repoPath string, refName plumbing.R
 	return nil
 }
 
+func gitFixObjectNotFound(ctx context.Context, repoPath string) error {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return err
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	_, err = worktree.Status()
+	if err != nil {
+		if errors.Is(err, plumbing.ErrObjectNotFound) {
+			if err1 := gitRefetch(ctx, repoPath); err1 != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func gitMakeClean(ctx context.Context, repoPath string) error {
 	isClean, err := gitIsClean(ctx, repoPath)
 	if err != nil {
@@ -643,6 +666,11 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 			return nil
 		case errors.Is(err, transport.ErrAuthenticationRequired):
 			return nil
+		case errors.Is(err, plumbing.ErrObjectNotFound):
+			if err1 := gitRefetch(ctx, repoPath); err1 != nil {
+				return err
+			}
+			// retry
 		case errors.Is(err, git.ErrNonFastForwardUpdate):
 			if err1 := gitResetDefaultBranch(ctx, repoPath); err1 != nil {
 				return err
@@ -923,6 +951,68 @@ func gitRepoPathGc(repoPath string) ([]byte, error) {
 	out, err := gitexec.Gc(&gitexec.GcOptions{
 		CmdDir: repoPath,
 		Prune:  "all",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func gitRefetch(ctx context.Context, repoPath string) error {
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	printProjectInfoContext(ctx)
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermInfoWithPrefixText("fetch --refetch")
+
+	prefixPrinter.Print()
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	out, err := gitRepoRefetch(repoPath)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	if len(out) > 0 {
+		pterm.Println()
+		pterm.Println(string(out))
+	}
+
+	return nil
+}
+
+func gitRepoRefetch(repoPath string) ([]byte, error) {
+	out, err := gitexec.Fetch(&gitexec.FetchOptions{
+		CmdDir:  repoPath,
+		Prune:   true,
+		Refetch: true,
 	})
 	if err != nil {
 		return nil, err
