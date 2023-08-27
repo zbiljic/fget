@@ -47,29 +47,29 @@ var gitDefaultClient = rhttp.NewClient(
 	rhttp.WithLogger(nil),
 )
 
-func gitProjectInfo(repoPath string) (string, *plumbing.Reference, error) {
+func gitProjectInfo(repoPath string) (string, string, *plumbing.Reference, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return "", nil, err
+		return "", "", nil, err
 	}
 
 	return gitRepoProjectInfo(repo)
 }
 
-func gitRepoProjectInfo(repo *git.Repository) (string, *plumbing.Reference, error) {
+func gitRepoProjectInfo(repo *git.Repository) (string, string, *plumbing.Reference, error) {
 	remoteURL, err := gitRepoRemoteConfigURL(repo)
 	if err != nil {
-		return "", nil, err
+		return "", "", nil, err
 	}
 
 	id := filepath.Join(remoteURL.Host, remoteURL.Path)
 
 	headRef, err := gitRepoHeadBranch(repo)
 	if err != nil {
-		return "", nil, err
+		return "", "", nil, err
 	}
 
-	return id, headRef, nil
+	return id, remoteURL.String(), headRef, nil
 }
 
 func gitRemoteConfigURL(repoPath string) (*url.URL, error) {
@@ -313,7 +313,7 @@ func gitReset(ctx context.Context, repoPath string, commit plumbing.Hash) error 
 }
 
 func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
-	_, headRef, err := gitProjectInfo(repoPath)
+	_, _, headRef, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return err
 	}
@@ -409,7 +409,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 }
 
 func gitResetDefaultBranch(ctx context.Context, repoPath string) error {
-	_, headRef, err := gitProjectInfo(repoPath)
+	_, _, headRef, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return err
 	}
@@ -749,7 +749,7 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 }
 
 func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
-	_, headRef, err := gitProjectInfo(repoPath)
+	_, _, headRef, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return false, err
 	}

@@ -34,7 +34,7 @@ func taskUpdateFn(
 
 		printProjectInfoHeaderFn := func() {
 			printProjectInfoHeaderOnce.Do(func() {
-				project, branchName, err := gitProjectInfo(repoPath)
+				_, remoteURL, branchName, err := gitProjectInfo(repoPath)
 				if err != nil {
 					err = fmt.Errorf("'%s': %w", repoPath, err)
 					ptermErrorMessageStyle.Println(err.Error())
@@ -44,7 +44,7 @@ func taskUpdateFn(
 				pterm.Println()
 				pterm.Printfln("[%d/%d] (active: %d)", index, config.TotalCount, len(config.Paths))
 				pterm.Println(repoPath)
-				ptermInfoMessageStyle.Println(project)
+				ptermInfoMessageStyle.Println(remoteURL)
 				ptermScopeStyle.Println(branchName.Name().Short())
 			})
 		}

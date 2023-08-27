@@ -49,7 +49,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		node, _ := it.Next()
 		repoPath := string(node.Key())
 
-		project, _, err := gitProjectInfo(repoPath)
+		project, _, _, err := gitProjectInfo(repoPath)
 		if err != nil {
 			return err
 		}
