@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -696,6 +697,7 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 				if _, ok := v.Err.(x509.HostnameError); ok {
 					return nil
 				}
+				return err
 			case *plumbing.UnexpectedError:
 				if pthttpErr, ok := v.Err.(*pthttp.Err); ok {
 					// don't retry on server errors
@@ -703,10 +705,17 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 						return nil
 					}
 				}
+				return err
+			case *exec.ExitError:
+				switch v.ExitCode() {
+				case 1:
+					if err1 := gitMakeClean(ctx, repoPath); err1 != nil {
+						return err
+					}
+					// retry
+				}
 			default:
 			}
-
-			return err
 		}
 
 		if attempt == 1 {
