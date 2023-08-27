@@ -947,18 +947,6 @@ func gitGc(ctx context.Context, repoPath string) error {
 	return nil
 }
 
-func gitRepoPathGc(repoPath string) ([]byte, error) {
-	out, err := gitexec.Gc(&gitexec.GcOptions{
-		CmdDir: repoPath,
-		Prune:  "all",
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return out, nil
-}
-
 func gitRefetch(ctx context.Context, repoPath string) error {
 	// complicated update locking
 	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
@@ -1006,17 +994,4 @@ func gitRefetch(ctx context.Context, repoPath string) error {
 	}
 
 	return nil
-}
-
-func gitRepoRefetch(repoPath string) ([]byte, error) {
-	out, err := gitexec.Fetch(&gitexec.FetchOptions{
-		CmdDir:  repoPath,
-		Prune:   true,
-		Refetch: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return out, nil
 }
