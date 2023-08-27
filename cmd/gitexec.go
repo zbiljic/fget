@@ -2,6 +2,18 @@ package cmd
 
 import "github.com/zbiljic/fget/pkg/gitexec"
 
+func gitRepoPathPull(repoPath string) ([]byte, error) {
+	out, err := gitexec.Pull(&gitexec.PullOptions{
+		CmdDir: repoPath,
+		Prune:  true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func gitRepoRefetch(repoPath string) ([]byte, error) {
 	out, err := gitexec.Fetch(&gitexec.FetchOptions{
 		CmdDir:  repoPath,

@@ -845,18 +845,9 @@ func gitPull(ctx context.Context, repoPath string) error {
 		return nil
 	}
 
-	repo, err := git.PlainOpen(repoPath)
+	out, err := gitRepoPathPull(repoPath)
 	if err != nil {
-		return err
-	}
-
-	out, err := gitRepoPull(repo)
-	if err != nil {
-		if errors.Is(err, git.NoErrAlreadyUpToDate) {
-			ptermInfoMessageStyle.Println(err.Error())
-		} else {
-			ptermErrorMessageStyle.Println(err.Error())
-		}
+		ptermErrorMessageStyle.Println(err.Error())
 		return err
 	}
 
@@ -868,25 +859,6 @@ func gitPull(ctx context.Context, repoPath string) error {
 	}
 
 	return nil
-}
-
-func gitRepoPull(repo *git.Repository) ([]byte, error) {
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return nil, err
-	}
-
-	buf := bytes.NewBuffer(nil)
-
-	err = worktree.Pull(&git.PullOptions{
-		Progress: buf,
-		Force:    true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
 }
 
 func gitPackObjectsCount(ctx context.Context, repoPath string) (int, error) {
