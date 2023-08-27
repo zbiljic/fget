@@ -780,7 +780,7 @@ func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
 
 		if errors.Is(err, ErrGitRepositoryNotReachable) {
 			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
-			return false, nil
+			return false, err
 		}
 
 		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {

@@ -37,6 +37,10 @@ func gitRunUpdate(ctx context.Context, repoPath string) error {
 			return nil
 		}
 
+		if errors.Is(err, ErrGitRepositoryNotReachable) {
+			return nil
+		}
+
 		return err
 	}
 
