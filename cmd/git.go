@@ -31,13 +31,18 @@ import (
 	"github.com/zbiljic/fget/pkg/rhttp"
 )
 
-const symrefPrefix = "ref: "
+const (
+	symrefPrefix     = "ref: "
+	errorPrefix      = "ERROR:"
+	isDisabledString = "is disabled"
+)
 
 var (
 	ErrGitMissingRemoteHeadReference  = errors.New("missing remote head reference")
 	ErrGitMissingBranchName           = errors.New("missing branch name")
 	ErrGitMissingRemoteHeadBranchName = errors.New("missing remote HEAD branch name")
 	ErrGitRepositoryNotReachable      = errors.New("repository not reachable")
+	ErrGitRepositoryDisabled          = errors.New("repository is disabled")
 )
 
 // gitDefaultClient is used for performing requests without explicitly making
@@ -356,6 +361,11 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 			return nil
 		}
 
+		if errors.Is(err, ErrGitRepositoryDisabled) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return err
+		}
+
 		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
@@ -452,6 +462,11 @@ func gitResetDefaultBranch(ctx context.Context, repoPath string) error {
 			return nil
 		}
 
+		if errors.Is(err, ErrGitRepositoryDisabled) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return err
+		}
+
 		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
@@ -526,10 +541,15 @@ func gitFindRemoteHeadReference(ctx context.Context, repoPath string) (*plumbing
 
 	out, err := gitexec.LsRemote(&gitexec.LsRemoteOptions{
 		CmdDir: repoPath,
-		Quiet:  true,
 		Symref: true,
 	})
 	if err != nil {
+		outString := string(out)
+		// check if repository is disabled
+		if strings.HasPrefix(outString, errorPrefix) && strings.Contains(outString, isDisabledString) {
+			return nil, ErrGitRepositoryDisabled
+		}
+
 		return nil, err
 	}
 
@@ -788,6 +808,11 @@ func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
 		}
 
 		if errors.Is(err, ErrGitRepositoryNotReachable) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return false, err
+		}
+
+		if errors.Is(err, ErrGitRepositoryDisabled) {
 			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			return false, err
 		}

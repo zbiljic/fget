@@ -33,11 +33,12 @@ func gitRunFix(ctx context.Context, repoPath string) error {
 
 func gitRunUpdate(ctx context.Context, repoPath string) error {
 	if err := gitCheckAndPull(ctx, repoPath); err != nil {
-		if errors.Is(err, git.NoErrAlreadyUpToDate) {
-			return nil
-		}
-
-		if errors.Is(err, ErrGitRepositoryNotReachable) {
+		switch {
+		case errors.Is(err, git.NoErrAlreadyUpToDate):
+			fallthrough
+		case errors.Is(err, ErrGitRepositoryNotReachable):
+			fallthrough
+		case errors.Is(err, ErrGitRepositoryDisabled):
 			return nil
 		}
 
