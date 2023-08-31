@@ -32,9 +32,11 @@ import (
 )
 
 const (
-	symrefPrefix     = "ref: "
-	errorPrefix      = "error:"
-	isDisabledString = "is disabled"
+	symrefPrefix                   = "ref: "
+	errorPrefix                    = "error:"
+	fatalPrefix                    = "fatal:"
+	isDisabledString               = "is disabled"
+	notPossibleToFastForwardString = "not possible to fast-forward"
 )
 
 var (
@@ -882,6 +884,15 @@ func gitPull(ctx context.Context, repoPath string) error {
 
 	out, err := gitRepoPathPull(repoPath)
 	if err != nil {
+		if len(out) > 0 {
+			outString := string(out)
+			outString = strings.ToLower(outString)
+			// check if not possible to fast forward
+			if strings.HasPrefix(outString, fatalPrefix) && strings.Contains(outString, notPossibleToFastForwardString) {
+				err = git.ErrNonFastForwardUpdate
+			}
+		}
+
 		ptermErrorMessageStyle.Println(err.Error())
 		return err
 	}
