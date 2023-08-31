@@ -33,7 +33,7 @@ import (
 
 const (
 	symrefPrefix     = "ref: "
-	errorPrefix      = "ERROR:"
+	errorPrefix      = "error:"
 	isDisabledString = "is disabled"
 )
 
@@ -545,6 +545,7 @@ func gitFindRemoteHeadReference(ctx context.Context, repoPath string) (*plumbing
 	})
 	if err != nil {
 		outString := string(out)
+		outString = strings.ToLower(outString)
 		// check if repository is disabled
 		if strings.HasPrefix(outString, errorPrefix) && strings.Contains(outString, isDisabledString) {
 			return nil, ErrGitRepositoryDisabled
