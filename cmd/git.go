@@ -37,6 +37,7 @@ const (
 	fatalPrefix                    = "fatal:"
 	isDisabledString               = "is disabled"
 	notPossibleToFastForwardString = "not possible to fast-forward"
+	unableToAccessString           = "unable to access"
 )
 
 var (
@@ -713,6 +714,8 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 			continue
 		case errors.Is(err, git.NoErrAlreadyUpToDate):
 			return err
+		case errors.Is(err, ErrGitRepositoryNotReachable):
+			return err
 		default:
 			switch v := err.(type) {
 			case *url.Error:
@@ -890,6 +893,10 @@ func gitPull(ctx context.Context, repoPath string) error {
 			// check if not possible to fast forward
 			if strings.HasPrefix(outString, fatalPrefix) && strings.Contains(outString, notPossibleToFastForwardString) {
 				err = git.ErrNonFastForwardUpdate
+			}
+			// check if accessible
+			if strings.HasPrefix(outString, fatalPrefix) && strings.Contains(outString, unableToAccessString) {
+				err = ErrGitRepositoryNotReachable
 			}
 		}
 
