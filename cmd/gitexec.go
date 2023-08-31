@@ -8,7 +8,7 @@ func gitRepoPathPull(repoPath string) ([]byte, error) {
 		Prune:  true,
 	})
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	return out, nil
@@ -21,7 +21,7 @@ func gitRepoRefetch(repoPath string) ([]byte, error) {
 		Refetch: true,
 	})
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	return out, nil
@@ -33,7 +33,7 @@ func gitRepoPathGc(repoPath string) ([]byte, error) {
 		Prune:  "all",
 	})
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	return out, nil
