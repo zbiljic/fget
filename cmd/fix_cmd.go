@@ -131,7 +131,7 @@ func runFix(cmd *cobra.Command, args []string) error {
 	pool := pond.New(int(opts.MaxWorkers), poolDefaultMaxCapacity)
 	defer pool.StopAndWait()
 
-	ctx := context.Background()
+	ctx := cmd.Context()
 
 	if opts.ExecTimeout > 0 {
 		var ctxCancelFn context.CancelFunc

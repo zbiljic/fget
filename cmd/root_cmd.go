@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -28,6 +30,10 @@ var rootCmd = &cobra.Command{
 	RunE:          runRoot,
 	SilenceErrors: true,
 	SilenceUsage:  true,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
+		cmd.SetContext(ctx)
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
