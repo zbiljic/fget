@@ -38,6 +38,7 @@ const (
 	isDisabledString               = "is disabled"
 	notPossibleToFastForwardString = "not possible to fast-forward"
 	unableToAccessString           = "unable to access"
+	butNoSuchRefWasFetchedString   = "but no such ref was fetched"
 )
 
 var (
@@ -706,6 +707,12 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 				return err
 			}
 			// retry
+		case errors.Is(err, plumbing.ErrReferenceNotFound):
+			if err1 := gitUpdateDefaultBranch(ctx, repoPath); err1 != nil {
+				return err
+			}
+			// NOTE: skip backoff, fast retry
+			continue
 		case errors.Is(err, storage.ErrReferenceHasChanged):
 			if err1 := gitFixReferences(ctx, repoPath); err1 != nil {
 				return err
@@ -897,6 +904,10 @@ func gitPull(ctx context.Context, repoPath string) error {
 			// check if accessible
 			if strings.HasPrefix(outString, fatalPrefix) && strings.Contains(outString, unableToAccessString) {
 				err = ErrGitRepositoryNotReachable
+			}
+			// check if default branch is changed
+			if strings.Contains(outString, butNoSuchRefWasFetchedString) {
+				err = plumbing.ErrReferenceNotFound
 			}
 		}
 
