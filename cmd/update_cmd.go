@@ -31,17 +31,19 @@ func init() {
 	updateCmd.Flags().BoolVarP(&pullCmdFlags.NoErrors, "no-errors", "s", false, "Suppress some errors")
 	updateCmd.Flags().BoolVarP(&pullCmdFlags.OnlyUpdated, "only-updated", "u", false, "Print only updated projects")
 	updateCmd.Flags().DurationVar(&pullCmdFlags.ExecTimeout, "exec-timeout", 0, "Duration after which process should stop")
+	updateCmd.Flags().DurationVar(&pullCmdFlags.RetryTimeout, "retry-timeout", defaultRetryMaxElapsedTime, "Duration for retry operation")
 
 	rootCmd.AddCommand(updateCmd)
 }
 
 type updateOptions struct {
-	Roots       []string
-	DryRun      bool
-	MaxWorkers  uint16
-	NoErrors    bool
-	OnlyUpdated bool
-	ExecTimeout time.Duration
+	Roots        []string
+	DryRun       bool
+	MaxWorkers   uint16
+	NoErrors     bool
+	OnlyUpdated  bool
+	ExecTimeout  time.Duration
+	RetryTimeout time.Duration
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
@@ -56,6 +58,8 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if err := mergo.Merge(&opts, pullCmdFlags); err != nil {
 		return err
 	}
+
+	retryMaxElapsedTime = opts.RetryTimeout
 
 	// for configuration
 	baseDir := opts.Roots[0]
