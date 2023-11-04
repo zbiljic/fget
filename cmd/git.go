@@ -39,6 +39,10 @@ const (
 	notPossibleToFastForwardString = "not possible to fast-forward"
 	unableToAccessString           = "unable to access"
 	butNoSuchRefWasFetchedString   = "but no such ref was fetched"
+	filesWouldBeOverwrittenByMerge = "files would be overwritten by merge"
+	oldMode                        = "old mode"
+	newMode                        = "new mode"
+	deletedFileMode                = "deleted file mode"
 )
 
 var (
@@ -314,6 +318,58 @@ func gitReset(ctx context.Context, repoPath string, commit plumbing.Hash) error 
 		Commit: commit,
 		Mode:   git.HardReset,
 	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func gitForceReset(ctx context.Context, repoPath string) error {
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	printProjectInfoContext(ctx)
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermWarningWithPrefixText("reset")
+
+	prefixPrinter.Print()
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	if err := gitResetHead(ctx, repoPath); err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return nil
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	return nil
+}
+
+func gitResetHead(ctx context.Context, repoPath string) error {
+	_, err := gitRepoReset(repoPath, string(plumbing.HEAD))
 	if err != nil {
 		return err
 	}
@@ -697,6 +753,14 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 				return err
 			}
 			// retry
+		case errors.Is(err, git.ErrWorktreeNotClean):
+			if err1 := gitIgnoreFileMode(ctx, repoPath); err1 != nil {
+				return err
+			}
+			if err1 := gitForceReset(ctx, repoPath); err1 != nil {
+				return err
+			}
+			// retry
 		case errors.Is(err, git.ErrNonFastForwardUpdate):
 			if err1 := gitResetDefaultBranch(ctx, repoPath); err1 != nil {
 				return err
@@ -905,6 +969,10 @@ func gitPull(ctx context.Context, repoPath string) error {
 			if strings.HasPrefix(outString, fatalPrefix) && strings.Contains(outString, unableToAccessString) {
 				err = ErrGitRepositoryNotReachable
 			}
+			// check if there are local changes
+			if strings.HasPrefix(outString, errorPrefix) && strings.Contains(outString, filesWouldBeOverwrittenByMerge) {
+				err = git.ErrWorktreeNotClean
+			}
 			// check if default branch is changed
 			if strings.Contains(outString, butNoSuchRefWasFetchedString) {
 				err = plumbing.ErrReferenceNotFound
@@ -1030,4 +1098,84 @@ func gitRefetch(ctx context.Context, repoPath string) error {
 	}
 
 	return nil
+}
+
+func gitIgnoreFileMode(ctx context.Context, repoPath string) error {
+	isDiffFileMode, err := gitIsDiffFileMode(ctx, repoPath)
+	if err != nil {
+		return err
+	}
+
+	if isDiffFileMode {
+		return nil
+	}
+
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	printProjectInfoContext(ctx)
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermInfoWithPrefixText("config core.filemode false")
+
+	prefixPrinter.Print()
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	out, err := gitRepoIgnoreFileMode(repoPath)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	if len(out) > 0 {
+		pterm.Println()
+		pterm.Println(string(out))
+	}
+
+	return nil
+}
+
+func gitIsDiffFileMode(ctx context.Context, repoPath string) (bool, error) {
+	out, err := gitRepoDiff(repoPath)
+	if err != nil {
+		return false, err
+	}
+
+	if len(out) == 0 {
+		return false, nil
+	}
+
+	outString := string(out)
+	outString = strings.ToLower(outString)
+	// check if diff due to file mode
+	if strings.Contains(outString, oldMode) ||
+		strings.Contains(outString, newMode) ||
+		strings.Contains(outString, deletedFileMode) {
+		return true, nil
+	}
+
+	return false, nil
 }

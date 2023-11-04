@@ -38,3 +38,41 @@ func gitRepoPathGc(repoPath string) ([]byte, error) {
 
 	return out, nil
 }
+
+func gitRepoReset(repoPath string, commit string) ([]byte, error) {
+	out, err := gitexec.Reset(&gitexec.ResetOptions{
+		CmdDir: repoPath,
+		Hard:   true,
+		Commit: commit,
+	})
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
+}
+
+func gitRepoDiff(repoPath string) ([]byte, error) {
+	out, err := gitexec.Diff(&gitexec.DiffOptions{
+		CmdDir: repoPath,
+		Cached: true,
+	})
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
+}
+
+func gitRepoIgnoreFileMode(repoPath string) ([]byte, error) {
+	out, err := gitexec.Config(&gitexec.ConfigOptions{
+		CmdDir: repoPath,
+		Name:   "core.filemode",
+		Value:  "false",
+	})
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
+}
