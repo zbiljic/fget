@@ -78,10 +78,5 @@ func LsRemote(opts *LsRemoteOptions) ([]byte, error) {
 
 	cmd := LsRemoteCmd(opts)
 
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, err
-	}
-
-	return out, nil
+	return run(cmd)
 }

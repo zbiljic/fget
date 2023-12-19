@@ -296,10 +296,5 @@ func Pull(opts *PullOptions) ([]byte, error) {
 
 	cmd := PullCmd(opts)
 
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, err
-	}
-
-	return out, nil
+	return run(cmd)
 }
