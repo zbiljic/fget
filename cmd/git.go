@@ -43,6 +43,7 @@ const (
 	oldMode                        = "old mode"
 	newMode                        = "new mode"
 	deletedFileMode                = "deleted file mode"
+	couldNotReadUsername           = "could not read username"
 )
 
 var (
@@ -51,6 +52,7 @@ var (
 	ErrGitMissingRemoteHeadBranchName = errors.New("missing remote HEAD branch name")
 	ErrGitRepositoryNotReachable      = errors.New("repository not reachable")
 	ErrGitRepositoryDisabled          = errors.New("repository is disabled")
+	ErrGitRepositoryProtected         = errors.New("repository is protected")
 )
 
 // gitDefaultClient is used for performing requests without explicitly making
@@ -426,6 +428,11 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 			return err
 		}
 
+		if errors.Is(err, ErrGitRepositoryProtected) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return err
+		}
+
 		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
@@ -527,6 +534,11 @@ func gitResetDefaultBranch(ctx context.Context, repoPath string) error {
 			return err
 		}
 
+		if errors.Is(err, ErrGitRepositoryProtected) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return err
+		}
+
 		if errors.Is(err, rhttp.ErrHttpMovedPermanently) {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
@@ -609,6 +621,10 @@ func gitFindRemoteHeadReference(ctx context.Context, repoPath string) (*plumbing
 		// check if repository is disabled
 		if strings.HasPrefix(outString, errorPrefix) && strings.Contains(outString, isDisabledString) {
 			return nil, ErrGitRepositoryDisabled
+		}
+		// check if auth required
+		if strings.HasPrefix(outString, fatalPrefix) && strings.Contains(outString, couldNotReadUsername) {
+			return nil, ErrGitRepositoryProtected
 		}
 
 		return nil, err
@@ -890,6 +906,11 @@ func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
 		}
 
 		if errors.Is(err, ErrGitRepositoryDisabled) {
+			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
+			return false, err
+		}
+
+		if errors.Is(err, ErrGitRepositoryProtected) {
 			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			return false, err
 		}

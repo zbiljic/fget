@@ -40,6 +40,8 @@ func gitRunUpdate(ctx context.Context, repoPath string) error {
 			fallthrough
 		case errors.Is(err, ErrGitRepositoryDisabled):
 			return nil
+		case errors.Is(err, ErrGitRepositoryProtected):
+			return nil
 		}
 
 		return err
