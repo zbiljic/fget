@@ -750,6 +750,10 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 	var err error
 
 	for i := 0; ; i++ {
+		if attempt >= retryMaxAttempts {
+			break
+		}
+
 		attempt++
 
 		if attempt > 1 {

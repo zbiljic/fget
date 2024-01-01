@@ -26,10 +26,12 @@ const (
 	defaultRetryWaitMin        = time.Second
 	defaultRetryWaitMax        = 10 * time.Second
 	defaultRetryMaxElapsedTime = time.Minute
+	defaultRetryMaxAttempts    = 100
 )
 
 var (
 	retryWaitMin        = defaultRetryWaitMin
 	retryWaitMax        = defaultRetryWaitMax
 	retryMaxElapsedTime = defaultRetryMaxElapsedTime
+	retryMaxAttempts    = defaultRetryMaxAttempts
 )
