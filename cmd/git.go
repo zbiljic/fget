@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -85,6 +87,17 @@ func gitRepoProjectInfo(repo *git.Repository) (string, string, *plumbing.Referen
 	}
 
 	return id, remoteURL.String(), headRef, nil
+}
+
+func gitRemoteURLProjectID(repoURL string) (string, error) {
+	remoteURL, err := giturls.Parse(repoURL)
+	if err != nil {
+		return "", err
+	}
+
+	id := filepath.Join(remoteURL.Host, remoteURL.Path)
+
+	return id, nil
 }
 
 func gitRemoteConfigURL(repoPath string) (*url.URL, error) {
@@ -380,7 +393,7 @@ func gitResetHead(ctx context.Context, repoPath string) error {
 }
 
 func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
-	_, _, headRef, err := gitProjectInfo(repoPath)
+	_, remoteURL, headRef, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return err
 	}
@@ -437,6 +450,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
 				prefixPrinter.Printfln("moved: %s", urlError.URL)
+				return &GitRepositoryMovedError{OldURL: remoteURL, NewURL: urlError.URL}
 			} else {
 				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			}
@@ -486,7 +500,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 }
 
 func gitResetDefaultBranch(ctx context.Context, repoPath string) error {
-	_, _, headRef, err := gitProjectInfo(repoPath)
+	_, remoteURL, headRef, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return err
 	}
@@ -543,6 +557,7 @@ func gitResetDefaultBranch(ctx context.Context, repoPath string) error {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
 				prefixPrinter.Printfln("moved: %s", urlError.URL)
+				return &GitRepositoryMovedError{OldURL: remoteURL, NewURL: urlError.URL}
 			} else {
 				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			}
@@ -871,7 +886,7 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 }
 
 func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
-	_, _, headRef, err := gitProjectInfo(repoPath)
+	_, remoteURL, headRef, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return false, err
 	}
@@ -928,6 +943,7 @@ func gitIsRemoteUpToDate(ctx context.Context, repoPath string) (bool, error) {
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
 				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.WarningMessageStyle).Printfln("moved: %s", urlError.URL)
+				return false, &GitRepositoryMovedError{OldURL: remoteURL, NewURL: urlError.URL}
 			} else {
 				prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
 			}
@@ -1208,4 +1224,131 @@ func gitIsDiffFileMode(ctx context.Context, repoPath string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	printProjectInfoContext(ctx)
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermInfoWithPrefixText("moving")
+
+	prefixPrinter.Printf("from '%s' to '%s'", oldURL, newURL)
+
+	pterm.Println()
+
+	prefixPrinter.Print()
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	oldID, err := gitRemoteURLProjectID(oldURL)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	newID, err := gitRemoteURLProjectID(newURL)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	if !strings.HasSuffix(repoPath, oldID) {
+		err = fmt.Errorf("unexpected repository path: %s", repoPath)
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	commonRepoPath := strings.TrimSuffix(repoPath, oldID)
+
+	fs := osfs.New(commonRepoPath)
+
+	newRepoPath := filepath.Join(commonRepoPath, newID)
+
+	// check if destination exists
+	if _, err := fs.Stat(newID); err != nil {
+		if os.IsExist(err) {
+			ptermErrorMessageStyle.Println(err.Error())
+			return err
+		}
+	} else {
+		ptermWarningMessageStyle.Printfln("already exists: %s", newRepoPath)
+
+		// just remove from old repo path
+		err = os.RemoveAll(repoPath)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	err = fs.MkdirAll(filepath.Dir(newID), os.ModePerm)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	err = fs.Rename(oldID, newID)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	newRepo, err := git.PlainOpen(newRepoPath)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	config, err := newRepo.Config()
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	remote, ok := config.Remotes[git.DefaultRemoteName]
+	if !ok {
+		err = fmt.Errorf("missing remote: %s", git.DefaultRemoteName)
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	if repoURL := remote.URLs[0]; repoURL != "" {
+		// update to new URL
+		remote.URLs[0] = newURL
+	}
+
+	// save updated config
+	err = newRepo.SetConfig(config)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	return nil
 }

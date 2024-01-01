@@ -33,6 +33,7 @@ func init() {
 var (
 	ptermInfoMessageStyle    = pterm.NewStyle(pterm.ThemeDefault.InfoMessageStyle...)
 	ptermSuccessMessageStyle = pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...)
+	ptermWarningMessageStyle = pterm.NewStyle(pterm.ThemeDefault.WarningMessageStyle...)
 	ptermErrorMessageStyle   = pterm.NewStyle(pterm.ThemeDefault.ErrorMessageStyle...)
 	ptermScopeStyle          = pterm.NewStyle(pterm.ThemeDefault.ScopeStyle...)
 )
