@@ -39,7 +39,7 @@ func gitRepoPathGc(repoPath string) ([]byte, error) {
 	return out, nil
 }
 
-func gitRepoReset(repoPath string, commit string) ([]byte, error) {
+func gitRepoReset(repoPath, commit string) ([]byte, error) {
 	out, err := gitexec.Reset(&gitexec.ResetOptions{
 		CmdDir: repoPath,
 		Hard:   true,
