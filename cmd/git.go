@@ -826,6 +826,11 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 						return err
 					}
 					// retry
+				case 128:
+					if err1 := gitResetDefaultBranch(ctx, repoPath); err1 != nil {
+						return err
+					}
+					// retry
 				}
 			default:
 			}
