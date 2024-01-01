@@ -36,6 +36,8 @@ func gitRunUpdate(ctx context.Context, repoPath string) error {
 		switch {
 		case errors.Is(err, git.NoErrAlreadyUpToDate):
 			fallthrough
+		case errors.Is(err, ErrGitMissingRemoteHeadReference):
+			fallthrough
 		case errors.Is(err, ErrGitRepositoryNotReachable):
 			fallthrough
 		case errors.Is(err, ErrGitRepositoryDisabled):

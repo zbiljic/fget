@@ -428,7 +428,7 @@ func gitUpdateDefaultBranch(ctx context.Context, repoPath string) error {
 
 		if errors.Is(err, ErrGitMissingRemoteHeadReference) {
 			prefixPrinter.WithMessageStyle(&pterm.ThemeDefault.ErrorMessageStyle).Println(err.Error())
-			return nil
+			return err
 		}
 
 		if errors.Is(err, ErrGitRepositoryNotReachable) {
@@ -808,7 +808,7 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 			// retry
 		case errors.Is(err, plumbing.ErrReferenceNotFound):
 			if err1 := gitUpdateDefaultBranch(ctx, repoPath); err1 != nil {
-				return err
+				return err1
 			}
 			// NOTE: skip backoff, fast retry
 			continue
