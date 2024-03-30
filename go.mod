@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/alitto/pond v1.8.3
-	github.com/cenkalti/backoff/v4 v4.2.1
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
 	github.com/go-git/go-billy/v5 v5.5.0
