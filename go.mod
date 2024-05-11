@@ -9,7 +9,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.12.0
-	github.com/hashicorp/go-retryablehttp v0.7.5
+	github.com/hashicorp/go-retryablehttp v0.7.6
 	github.com/imdario/mergo v0.3.16
 	github.com/mattn/go-isatty v0.0.20
 	github.com/plar/go-adaptive-radix-tree v1.0.5
@@ -19,7 +19,7 @@ require (
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
-	golang.org/x/sys v0.19.0
+	golang.org/x/sys v0.20.0
 )
 
 require (
