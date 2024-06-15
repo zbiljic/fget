@@ -15,7 +15,7 @@ require (
 	github.com/plar/go-adaptive-radix-tree v1.0.5
 	github.com/pterm/pterm v0.12.66
 	github.com/samber/lo v1.39.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
