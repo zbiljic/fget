@@ -19,7 +19,7 @@ require (
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
-	golang.org/x/sys v0.21.0
+	golang.org/x/sys v0.22.0
 )
 
 require (
