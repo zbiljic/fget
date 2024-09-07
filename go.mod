@@ -3,7 +3,7 @@ module github.com/zbiljic/fget
 go 1.19
 
 require (
-	github.com/alitto/pond v1.9.1
+	github.com/alitto/pond v1.9.2
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
