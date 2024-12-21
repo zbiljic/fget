@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/imdario/mergo v0.3.16
 	github.com/mattn/go-isatty v0.0.20
-	github.com/plar/go-adaptive-radix-tree v1.0.6
+	github.com/plar/go-adaptive-radix-tree v1.0.7
 	github.com/pterm/pterm v0.12.66
 	github.com/samber/lo v1.47.0
 	github.com/spf13/cobra v1.8.1
