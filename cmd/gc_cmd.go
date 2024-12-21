@@ -6,7 +6,7 @@ import (
 
 	"github.com/alitto/pond"
 	"github.com/imdario/mergo"
-	art "github.com/plar/go-adaptive-radix-tree"
+	art "github.com/plar/go-adaptive-radix-tree/v2"
 	"github.com/pterm/pterm"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
