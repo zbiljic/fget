@@ -12,10 +12,6 @@ permissions:
   contents: read
   pull-requests: read
 
-env:
-  GO_VERSION: 1.19.5
-  GOLANGCI_LINT_VERSION: 1.50.1
-
 jobs:
   golangci:
     name: lint
@@ -24,6 +20,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Set Github ENV variables
+        shell: bash
+        run: |
+          echo "GO_VERSION=$(cat go.mod | sed -En 's/go ([0-9.]+)/\1/p' | tr -d '[:blank:]')" >> $GITHUB_ENV
+          echo "GOLANGCI_LINT_VERSION=$(cat Makefile | sed -En 's/GOLANGCI_LINT_VERSION.+v(.*)/\1/p')" >> $GITHUB_ENV
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
