@@ -8,7 +8,7 @@ GOLANGCI_LINT_VERSION ?= v1.63.4
 GOFUMPT ?= $(shell which gofumpt)
 GOFUMPT_VERSION ?= v0.7.0
 GORELEASER ?= $(shell which goreleaser)
-GORELEASER_VERSION ?= v1.14.1
+GORELEASER_VERSION ?= v2.5.1
 
 # Using directory as project name.
 PROJECT_NAME := $(shell basename $(PROJECT_ROOT))
