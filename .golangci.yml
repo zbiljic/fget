@@ -2,14 +2,11 @@
 run:
   timeout: 5m
   issues-exit-code: 0
-  skip-dirs:
-    - proto
-  skip-files:
-    - ".*\\.mock\\.go$"
 # output configuration options
 output:
-  # Format: colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
-  format: colored-line-number
+  # Format: `colored-line-number`, `line-number`, `json`, `colored-tab`, `tab`, `checkstyle`, `code-climate`, `junit-xml`, `github-actions`, `teamcity`
+  formats:
+    - format: colored-line-number
 # All available settings of specific linters.
 # Refer to https://golangci-lint.run/usage/linters
 linters-settings:
@@ -31,8 +28,9 @@ linters:
     - makezero
     - misspell
     - unconvert
-  disable:
-    - deadcode
-    - varcheck
 issues:
+  exclude-dirs:
+    - proto
   exclude-use-default: true
+  exclude-files:
+    - ".*\\.mock\\.go$"
