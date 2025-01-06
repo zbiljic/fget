@@ -22,9 +22,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5.2.0
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: false
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6.1.1
         with:
