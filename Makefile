@@ -4,7 +4,7 @@ THIS_OS := $(shell uname)
 
 GOTESTSUM_VERSION ?= v1.8.2
 GOLANGCI_LINT ?= $(shell which golangci-lint)
-GOLANGCI_LINT_VERSION ?= v1.50.1
+GOLANGCI_LINT_VERSION ?= v1.63.4
 GOFUMPT ?= $(shell which gofumpt)
 GOFUMPT_VERSION ?= v0.4.0
 GORELEASER ?= $(shell which goreleaser)
