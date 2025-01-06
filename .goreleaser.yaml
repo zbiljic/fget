@@ -1,3 +1,5 @@
+version: 2
+
 project_name: fget
 
 before:
@@ -20,11 +22,8 @@ archives:
   - files:
       - none*
 
-snapshot:
-  name_template: "{{ incpatch .Version }}-SNAPSHOT-{{ .ShortCommit }}"
-
 changelog:
-  skip: true
+  disable: true
 
 release:
   disable: true
