@@ -45,6 +45,7 @@ func gitRunUpdate(ctx context.Context, repoPath string) error {
 		case errors.Is(err, ErrGitRepositoryProtected):
 			return nil
 		default:
+			//nolint:gocritic
 			switch v := err.(type) {
 			case *GitRepositoryMovedError:
 				if err1 := gitMove(ctx, repoPath, v.OldURL, v.NewURL); err1 != nil {

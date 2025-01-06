@@ -744,6 +744,7 @@ func gitReplaceDefaultBranch(ctx context.Context, repoPath string, from, to *plu
 	return nil
 }
 
+//nolint:gocyclo
 func gitCheckAndPull(ctx context.Context, repoPath string) error {
 	if isRemoteUpToDate, err := gitIsRemoteUpToDate(ctx, repoPath); err != nil {
 		return err
