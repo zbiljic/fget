@@ -14,6 +14,18 @@ func gitRepoPathPull(repoPath string) ([]byte, error) {
 	return out, nil
 }
 
+func gitRepoFetch(repoPath string) ([]byte, error) {
+	out, err := gitexec.Fetch(&gitexec.FetchOptions{
+		CmdDir: repoPath,
+		Prune:  true,
+	})
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
+}
+
 func gitRepoRefetch(repoPath string) ([]byte, error) {
 	out, err := gitexec.Fetch(&gitexec.FetchOptions{
 		CmdDir:  repoPath,

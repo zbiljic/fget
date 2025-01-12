@@ -796,6 +796,12 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 			if err1 := gitForceReset(ctx, repoPath); err1 != nil {
 				return err
 			}
+			if err1 := gitFetch(ctx, repoPath); err1 != nil {
+				return err
+			}
+			if err1 := gitResetDefaultBranch(ctx, repoPath); err1 != nil {
+				return err
+			}
 			// retry
 		case errors.Is(err, git.ErrNonFastForwardUpdate):
 			if err1 := gitResetDefaultBranch(ctx, repoPath); err1 != nil {
@@ -1083,6 +1089,55 @@ func gitGc(ctx context.Context, repoPath string) error {
 	}
 
 	out, err := gitRepoPathGc(repoPath)
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	if len(out) > 0 {
+		pterm.Println()
+		pterm.Println(string(out))
+	}
+
+	return nil
+}
+
+func gitFetch(ctx context.Context, repoPath string) error {
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	printProjectInfoContext(ctx)
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermInfoWithPrefixText("fetch")
+
+	prefixPrinter.Print()
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	out, err := gitRepoFetch(repoPath)
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
 		return err
