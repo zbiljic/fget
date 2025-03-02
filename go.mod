@@ -1,8 +1,6 @@
 module github.com/zbiljic/fget
 
-go 1.21
-
-toolchain go1.23.4
+go 1.24.0
 
 require (
 	github.com/alitto/pond v1.9.2
