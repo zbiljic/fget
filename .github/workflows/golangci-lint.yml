@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - main
+      - renovate/**
     tags:
       - v*
   pull_request:
+    paths-ignore:
+      - "**.md"
 
 permissions:
   contents: read
