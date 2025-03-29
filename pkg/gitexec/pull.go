@@ -78,6 +78,7 @@ type PullOptions struct {
 	Refspec    string
 }
 
+//nolint:gocyclo
 func PullCmd(opts *PullOptions) *exec.Cmd {
 	args := []string{"pull"}
 
