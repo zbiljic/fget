@@ -50,7 +50,7 @@ func GitObjectsDirs(gitRootPath string) ([]string, error) {
 	var objectsDirs []string
 
 	for _, dir := range dirs {
-		if dir.IsDir() && !(strings.EqualFold(dir.Name(), "info") || strings.EqualFold(dir.Name(), "pack")) {
+		if dir.IsDir() && (!strings.EqualFold(dir.Name(), "info") && !strings.EqualFold(dir.Name(), "pack")) {
 			objectsDirs = append(objectsDirs, filepath.Join(gitRootPath, ".git/objects", dir.Name()))
 		}
 	}

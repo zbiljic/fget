@@ -36,7 +36,7 @@ func TestReadVersionErr(t *testing.T) {
 		t.Fatal("Unexpected should fail to fetch version")
 	}
 
-	defer os.Remove("test.json")
+	defer os.Remove("test.json") //nolint:errcheck
 	err = os.WriteFile("test.json", []byte("{ \"version\":2 }"), 0o644)
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestReadVersionErr(t *testing.T) {
 }
 
 func TestSaveFailOnDir(t *testing.T) {
-	defer os.RemoveAll("test-1.json")
+	defer os.RemoveAll("test-1.json") //nolint:errcheck
 	err := os.MkdirAll("test-1.json", 0o644)
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestLoadFile(t *testing.T) {
 }
 
 func TestSaveLoad(t *testing.T) {
-	defer os.RemoveAll("test.json")
+	defer os.RemoveAll("test.json") //nolint:errcheck
 	type myStruct struct {
 		Version     string
 		User        string

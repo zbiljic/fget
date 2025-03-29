@@ -58,6 +58,7 @@ type FetchOptions struct {
 	Refspec    string
 }
 
+//nolint:gocyclo
 func FetchCmd(opts *FetchOptions) *exec.Cmd {
 	args := []string{"fetch"}
 

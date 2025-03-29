@@ -15,8 +15,8 @@ const (
 
 // ErrExit writes an error to the given io.Writer & exits.
 func ErrExit(w io.Writer, err error) {
-	fmt.Fprint(w, "Error: ")
-	fmt.Fprintln(w, err.Error())
+	fmt.Fprint(w, "Error: ")     //nolint:errcheck
+	fmt.Fprintln(w, err.Error()) //nolint:errcheck
 
 	os.Exit(ExitCodeErr)
 }
