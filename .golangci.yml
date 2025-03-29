@@ -1,40 +1,25 @@
-# Options for analysis running.
+version: "2"
 run:
-  timeout: 5m
   issues-exit-code: 0
-# output configuration options
 output:
-  # Format: `colored-line-number`, `line-number`, `json`, `colored-tab`, `tab`, `checkstyle`, `code-climate`, `junit-xml`, `github-actions`, `teamcity`
   formats:
-    - format: colored-line-number
-# All available settings of specific linters.
-# Refer to https://golangci-lint.run/usage/linters
-linters-settings:
-  gofumpt:
-    # Choose whether to use the extra rules.
-    # Default: false
-    extra-rules: true
-  govet:
-    # Disable analyzers by name.
-    # Run `go tool vet help` to see all analyzers.
-    disable:
-      - stdmethods
+    text:
+      path: stdout
 linters:
   enable:
     - gocritic
     - gocyclo
     - godox
-    - gofumpt
     - makezero
     - misspell
     - unconvert
-issues:
-  exclude-dirs:
-    - proto
-  exclude-use-default: true
-  exclude-files:
-    - ".*\\.mock\\.go$"
-  exclude-rules:
-    - path: 'gitexec/(.+)\.go'
-      linters:
-        - gocyclo
+  settings:
+    govet:
+      disable:
+        - stdmethods
+formatters:
+  enable:
+    - gofumpt
+  settings:
+    gofumpt:
+      extra-rules: true
