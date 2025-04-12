@@ -3,6 +3,7 @@ module github.com/zbiljic/fget
 go 1.24.0
 
 require (
+	dario.cat/mergo v1.0.1
 	github.com/alitto/pond v1.9.2
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-semver v0.3.1
@@ -10,7 +11,6 @@ require (
 	github.com/go-git/go-billy/v5 v5.6.2
 	github.com/go-git/go-git/v5 v5.14.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
-	github.com/imdario/mergo v0.3.16
 	github.com/mattn/go-isatty v0.0.20
 	github.com/plar/go-adaptive-radix-tree/v2 v2.0.3
 	github.com/pterm/pterm v0.12.80
@@ -26,7 +26,6 @@ require (
 	atomicgo.dev/cursor v0.2.0 // indirect
 	atomicgo.dev/keyboard v0.2.9 // indirect
 	atomicgo.dev/schedule v0.1.0 // indirect
-	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.5 // indirect
 	github.com/cloudflare/circl v1.6.0 // indirect
