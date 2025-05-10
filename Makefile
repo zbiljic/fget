@@ -2,7 +2,7 @@ SHELL = bash
 PROJECT_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 THIS_OS := $(shell uname)
 
-GOTESTSUM_VERSION ?= v1.12.0
+GOTESTSUM_VERSION ?= v1.12.2
 GOLANGCI_LINT ?= $(shell which golangci-lint)
 GOLANGCI_LINT_VERSION ?= v2.0.2
 GOFUMPT ?= $(shell which gofumpt)
