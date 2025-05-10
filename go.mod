@@ -3,7 +3,7 @@ module github.com/zbiljic/fget
 go 1.24.0
 
 require (
-	dario.cat/mergo v1.0.1
+	dario.cat/mergo v1.0.2
 	github.com/alitto/pond v1.9.2
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-semver v0.3.1
