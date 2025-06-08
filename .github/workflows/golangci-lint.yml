@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           echo "GO_VERSION=$(cat go.mod | sed -En 's/go ([0-9.]+)/\1/p' | tr -d '[:blank:]')" >> $GITHUB_ENV
-          echo "GOLANGCI_LINT_VERSION=$(cat Makefile | sed -En 's/GOLANGCI_LINT_VERSION.+v(.*)/\1/p')" >> $GITHUB_ENV
+          echo "GOLANGCI_LINT_VERSION=$(cat mise.toml | sed -En 's/golangci-lint.+"(.*)"/\1/p')" >> $GITHUB_ENV
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
