@@ -1,14 +1,5 @@
 SHELL = bash
 PROJECT_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
-THIS_OS := $(shell uname)
-
-GOTESTSUM_VERSION ?= v1.12.2
-GOLANGCI_LINT ?= $(shell which golangci-lint)
-GOLANGCI_LINT_VERSION ?= v2.1.6
-GOFUMPT ?= $(shell which gofumpt)
-GOFUMPT_VERSION ?= v0.8.0
-GORELEASER ?= $(shell which goreleaser)
-GORELEASER_VERSION ?= v2.9.0
 
 # Using directory as project name.
 PROJECT_NAME := $(shell basename $(PROJECT_ROOT))
@@ -28,25 +19,19 @@ endif
 # include per-user customization after all variables are defined
 -include Makefile.local
 
+.PHONY: tools
+tools:
+	@command -v mise >/dev/null 2>&1 || { \
+	  echo >&2 "Error: 'mise' not found in your PATH."; \
+	  echo >&2 "Quick-install: 'curl https://mise.run | sh'"; \
+	  echo >&2 "Full install instructions: https://mise.jdx.dev/installing-mise.html"; \
+	  exit 1; \
+	}
+
 # Only for CI compliance
 .PHONY: bootstrap
-bootstrap: deps lint-deps build-deps # Install all dependencies
-
-.PHONY: deps
-deps: ## Install build and development dependencies
-	@echo "==> Updating build dependencies..."
-	@go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
-
-.PHONY: lint-deps
-lint-deps: ## Install linter dependencies
-	@echo "==> Updating linter dependencies..."
-	@which golangci-lint 2>/dev/null || ( curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION) && echo "Installed golangci-lint" )
-	@which gofumpt 2>/dev/null || ( go install mvdan.cc/gofumpt@$(GOFUMPT_VERSION) && echo "Installed gofumpt" )
-
-.PHONY: build-deps
-build-deps: ## Install builder dependencies
-	@echo "==> Updating builder dependencies..."
-	@which goreleaser 2>/dev/null || ( pushd $$(go env GOPATH)/bin && curl -sfL https://i.jpillora.com/goreleaser/goreleaser@$(GORELEASER_VERSION) | sh && echo "Installed goreleaser" )
+bootstrap: tools # Install all dependencies
+	@mise install
 
 .PHONY: tidy
 tidy:
@@ -54,9 +39,10 @@ tidy:
 	@go mod tidy
 
 .PHONY: check
+check: tools
 check: ## Lint the source code
 	@echo "==> Linting source code..."
-	$(GOLANGCI_LINT) run -j 1
+	@mise x -- golangci-lint run -j 1
 
 	@echo "==> Checking Go mod..."
 	$(MAKE) tidy
@@ -67,14 +53,16 @@ check: ## Lint the source code
 		exit 1; fi
 
 .PHONY: gofmt
+gofmt: tools
 gofmt: ## Format Go code
-	$(GOFUMPT) -extra -l -w .
+	@mise x -- gofumpt -extra -l -w .
 
 .PHONY: gogenerate
 gogenerate: ## Generate code from Go code
 	@go generate ./...
 
 .PHONY: dev
+dev: tools
 dev: GOOS=$(shell go env GOOS)
 dev: GOARCH=$(shell go env GOARCH)
 dev: GOPATH=$(shell go env GOPATH)
@@ -85,7 +73,7 @@ dev: ## Build for the current development platform
 	@rm -fv $(GOPATH)/bin/$(PROJECT_NAME)
 
 	@echo "==> Building only for current GOOS and GOARCH..."
-	$(GORELEASER) build \
+	mise x -- goreleaser build \
 		$(if $(VERBOSE),--debug) \
 		--snapshot \
 		--rm-dist \
@@ -98,12 +86,13 @@ dev: ## Build for the current development platform
 	@cp -v $(PROJECT_ROOT)/$(DEV_TARGET) $(GOPATH)/bin
 
 .PHONY: snapshot
+snapshot: tools
 snapshot: ## Build snapshot packages
 	@echo "==> Building snapshot packages..."
-	$(GORELEASER) release \
-		$(if $(VERBOSE),--debug) \
+	mise x -- goreleaser release \
+		$(if $(VERBOSE),--verbose) \
 		--snapshot \
-		--rm-dist
+		--clean
 
 	@find $(PROJECT_ROOT)/dist
 
