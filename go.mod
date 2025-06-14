@@ -17,8 +17,9 @@ require (
 	github.com/samber/lo v1.51.0
 	github.com/spf13/cobra v1.9.1
 	github.com/tevino/abool/v2 v2.1.0
+	github.com/thediveo/enumflag/v2 v2.0.7
 	github.com/whilp/git-urls v1.0.0
-	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/exp v0.0.0-20250103183323-7d7fa50e5329
 	golang.org/x/sys v0.33.0
 )
 

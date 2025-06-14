@@ -9,6 +9,7 @@ import (
 	"dario.cat/mergo"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"github.com/thediveo/enumflag/v2"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
 )
@@ -22,26 +23,39 @@ var listCmd = &cobra.Command{
 	RunE:        runList,
 }
 
+// OutputFormat represents the output format type
+type OutputFormat enumflag.Flag
+
 // Output format constants
 const (
-	OutputFormatText  = "text"
-	OutputFormatJSON  = "json"
-	OutputFormatTable = "table"
+	OutputFormatText OutputFormat = iota
+	OutputFormatJSON
+	OutputFormatTable
 )
 
+// OutputFormatIds maps the enum values to their string representations
+var OutputFormatIds = map[OutputFormat][]string{
+	OutputFormatText:  {"text"},
+	OutputFormatJSON:  {"json"},
+	OutputFormatTable: {"table"},
+}
+
 var listCmdFlags = listOptions{
-	OutputFormat: "",
+	OutputFormat: OutputFormatText,
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
 
-	listCmd.Flags().StringVarP(&listCmdFlags.OutputFormat, "output", "o", OutputFormatText, "Output format: text|json|table")
+	listCmd.Flags().VarP(
+		enumflag.New(&listCmdFlags.OutputFormat, "output", OutputFormatIds, enumflag.EnumCaseInsensitive),
+		"output", "o",
+		"Output format: text|json|table")
 }
 
 type listOptions struct {
 	Roots        []string
-	OutputFormat string
+	OutputFormat OutputFormat
 }
 
 type repoInfo struct {
