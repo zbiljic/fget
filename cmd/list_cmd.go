@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"dario.cat/mergo"
 	"github.com/pterm/pterm"
@@ -59,10 +60,11 @@ type listOptions struct {
 }
 
 type repoInfo struct {
-	Path    string `json:"path"`
-	URL     string `json:"url"`
-	Branch  string `json:"branch,omitempty"`
-	IsClean bool   `json:"is_clean,omitempty"`
+	Path        string    `json:"path"`
+	URL         string    `json:"url"`
+	Branch      string    `json:"branch,omitempty"`
+	IsClean     bool      `json:"is_clean,omitempty"`
+	LastUpdated time.Time `json:"last_updated,omitempty"`
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -113,11 +115,17 @@ func runList(cmd *cobra.Command, args []string) error {
 				return err
 			}
 
+			lastUpdated, err := gitLastCommitDate(repoPath)
+			if err != nil {
+				return err
+			}
+
 			repos = append(repos, repoInfo{
-				Path:    project,
-				URL:     url,
-				Branch:  branch,
-				IsClean: isClean,
+				Path:        project,
+				URL:         url,
+				Branch:      branch,
+				IsClean:     isClean,
+				LastUpdated: lastUpdated,
 			})
 		default:
 			pterm.Println(project)
@@ -170,6 +178,12 @@ func outputTable(w io.Writer, repos []repoInfo) error {
 	maxURLWidth := len("URL")
 	maxBranchWidth := len("Branch")
 	maxStatusWidth := len("Status")
+	maxLastUpdatedWidth := len("Last Updated")
+
+	lastUpdatedFormat := time.DateOnly
+	if len(lastUpdatedFormat) > maxLastUpdatedWidth {
+		maxLastUpdatedWidth = len(lastUpdatedFormat)
+	}
 
 	for _, repo := range repos {
 		if len(repo.Path) > maxPathWidth {
@@ -188,23 +202,26 @@ func outputTable(w io.Writer, repos []repoInfo) error {
 	maxURLWidth += 2
 	maxBranchWidth += 2
 	maxStatusWidth += 2
+	maxLastUpdatedWidth += 2
 
 	// Write markdown table header with padded columns
-	headerRow := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s |\n",
+	headerRow := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s |\n",
 		maxPathWidth, "Repository",
 		maxURLWidth, "URL",
 		maxBranchWidth, "Branch",
-		maxStatusWidth, "Status")
+		maxStatusWidth, "Status",
+		maxLastUpdatedWidth, "Last Updated")
 	if _, err := io.WriteString(w, headerRow); err != nil {
 		return err
 	}
 
 	// Write separator row with uniform width
-	separatorRow := fmt.Sprintf("| %s | %s | %s | %s |\n",
+	separatorRow := fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
 		strings.Repeat("-", maxPathWidth),
 		strings.Repeat("-", maxURLWidth),
 		strings.Repeat("-", maxBranchWidth),
-		strings.Repeat("-", maxStatusWidth))
+		strings.Repeat("-", maxStatusWidth),
+		strings.Repeat("-", maxLastUpdatedWidth))
 	if _, err := io.WriteString(w, separatorRow); err != nil {
 		return err
 	}
@@ -216,11 +233,12 @@ func outputTable(w io.Writer, repos []repoInfo) error {
 			status = "modified"
 		}
 
-		row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s |\n",
+		row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s |\n",
 			maxPathWidth, repo.Path,
 			maxURLWidth, repo.URL,
 			maxBranchWidth, repo.Branch,
-			maxStatusWidth, status)
+			maxStatusWidth, status,
+			maxLastUpdatedWidth, repo.LastUpdated.Format(lastUpdatedFormat))
 		if _, err := io.WriteString(w, row); err != nil {
 			return err
 		}

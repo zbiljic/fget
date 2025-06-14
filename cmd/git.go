@@ -1408,3 +1408,22 @@ func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
 
 	return nil
 }
+
+func gitLastCommitDate(repoPath string) (time.Time, error) {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	headRef, err := repo.Head()
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	commit, err := repo.CommitObject(headRef.Hash())
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return commit.Committer.When, nil
+}
