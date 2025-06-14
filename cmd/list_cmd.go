@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 
 	"dario.cat/mergo"
 	"github.com/pterm/pterm"
@@ -22,8 +24,9 @@ var listCmd = &cobra.Command{
 
 // Output format constants
 const (
-	OutputFormatText = "text"
-	OutputFormatJSON = "json"
+	OutputFormatText  = "text"
+	OutputFormatJSON  = "json"
+	OutputFormatTable = "table"
 )
 
 var listCmdFlags = listOptions{
@@ -33,7 +36,7 @@ var listCmdFlags = listOptions{
 func init() {
 	rootCmd.AddCommand(listCmd)
 
-	listCmd.Flags().StringVarP(&listCmdFlags.OutputFormat, "output", "o", OutputFormatText, "Output format: text|json")
+	listCmd.Flags().StringVarP(&listCmdFlags.OutputFormat, "output", "o", OutputFormatText, "Output format: text|json|table")
 }
 
 type listOptions struct {
@@ -84,24 +87,34 @@ func runList(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if opts.OutputFormat == OutputFormatJSON {
+		switch opts.OutputFormat {
+		case OutputFormatJSON, OutputFormatTable:
 			branch := ""
 			if ref != nil {
 				branch = ref.Name().Short()
 			}
 
+			isClean, err := gitIsClean(cmd.Context(), repoPath)
+			if err != nil {
+				return err
+			}
+
 			repos = append(repos, repoInfo{
-				Path:   project,
-				URL:    url,
-				Branch: branch,
+				Path:    project,
+				URL:     url,
+				Branch:  branch,
+				IsClean: isClean,
 			})
-		} else {
+		default:
 			pterm.Println(project)
 		}
 	}
 
-	if opts.OutputFormat == OutputFormatJSON {
+	switch opts.OutputFormat {
+	case OutputFormatJSON:
 		return outputJSON(cmd.OutOrStdout(), repos)
+	case OutputFormatTable:
+		return outputTable(cmd.OutOrStdout(), repos)
 	}
 
 	return nil
@@ -131,4 +144,73 @@ func outputJSON(w io.Writer, v interface{}) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(v)
+}
+
+func outputTable(w io.Writer, repos []repoInfo) error {
+	if len(repos) == 0 {
+		return nil
+	}
+
+	// Find maximum width for each column
+	maxPathWidth := len("Repository")
+	maxURLWidth := len("URL")
+	maxBranchWidth := len("Branch")
+	maxStatusWidth := len("Status")
+
+	for _, repo := range repos {
+		if len(repo.Path) > maxPathWidth {
+			maxPathWidth = len(repo.Path)
+		}
+		if len(repo.URL) > maxURLWidth {
+			maxURLWidth = len(repo.URL)
+		}
+		if len(repo.Branch) > maxBranchWidth {
+			maxBranchWidth = len(repo.Branch)
+		}
+	}
+
+	// Add some padding
+	maxPathWidth += 2
+	maxURLWidth += 2
+	maxBranchWidth += 2
+	maxStatusWidth += 2
+
+	// Write markdown table header with padded columns
+	headerRow := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s |\n",
+		maxPathWidth, "Repository",
+		maxURLWidth, "URL",
+		maxBranchWidth, "Branch",
+		maxStatusWidth, "Status")
+	if _, err := io.WriteString(w, headerRow); err != nil {
+		return err
+	}
+
+	// Write separator row with uniform width
+	separatorRow := fmt.Sprintf("| %s | %s | %s | %s |\n",
+		strings.Repeat("-", maxPathWidth),
+		strings.Repeat("-", maxURLWidth),
+		strings.Repeat("-", maxBranchWidth),
+		strings.Repeat("-", maxStatusWidth))
+	if _, err := io.WriteString(w, separatorRow); err != nil {
+		return err
+	}
+
+	// Write table rows with padded columns
+	for _, repo := range repos {
+		status := "clean"
+		if !repo.IsClean {
+			status = "modified"
+		}
+
+		row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s |\n",
+			maxPathWidth, repo.Path,
+			maxURLWidth, repo.URL,
+			maxBranchWidth, repo.Branch,
+			maxStatusWidth, status)
+		if _, err := io.WriteString(w, row); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
