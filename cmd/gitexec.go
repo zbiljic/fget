@@ -1,6 +1,11 @@
 package cmd
 
-import "github.com/zbiljic/fget/pkg/gitexec"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/zbiljic/fget/pkg/gitexec"
+)
 
 func gitRepoPathPull(repoPath string) ([]byte, error) {
 	out, err := gitexec.Pull(&gitexec.PullOptions{
@@ -87,4 +92,23 @@ func gitRepoIgnoreFileMode(repoPath string) ([]byte, error) {
 	}
 
 	return out, nil
+}
+
+func gitRepoCommitCount(repoPath string) (int, error) {
+	out, err := gitexec.RevList(&gitexec.RevListOptions{
+		CmdDir:   repoPath,
+		Count:    true,
+		Revision: "HEAD",
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	_, err = fmt.Sscanf(strings.TrimSpace(string(out)), "%d", &count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

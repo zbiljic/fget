@@ -65,6 +65,7 @@ type repoInfo struct {
 	Branch      string    `json:"branch,omitempty"`
 	IsClean     bool      `json:"is_clean,omitempty"`
 	LastUpdated time.Time `json:"last_updated,omitempty"`
+	CommitCount int       `json:"commit_count,omitempty"`
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -120,12 +121,18 @@ func runList(cmd *cobra.Command, args []string) error {
 				return err
 			}
 
+			commitCount, err := gitRepoCommitCount(repoPath)
+			if err != nil {
+				return err
+			}
+
 			repos = append(repos, repoInfo{
 				Path:        project,
 				URL:         url,
 				Branch:      branch,
 				IsClean:     isClean,
 				LastUpdated: lastUpdated,
+				CommitCount: commitCount,
 			})
 		default:
 			pterm.Println(project)
@@ -179,6 +186,7 @@ func outputTable(w io.Writer, repos []repoInfo) error {
 	maxBranchWidth := len("Branch")
 	maxStatusWidth := len("Status")
 	maxLastUpdatedWidth := len("Last Updated")
+	maxCommitCountWidth := len("Commits")
 
 	lastUpdatedFormat := time.DateOnly
 	if len(lastUpdatedFormat) > maxLastUpdatedWidth {
@@ -203,25 +211,28 @@ func outputTable(w io.Writer, repos []repoInfo) error {
 	maxBranchWidth += 2
 	maxStatusWidth += 2
 	maxLastUpdatedWidth += 2
+	maxCommitCountWidth += 2
 
 	// Write markdown table header with padded columns
-	headerRow := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s |\n",
+	headerRow := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n",
 		maxPathWidth, "Repository",
 		maxURLWidth, "URL",
 		maxBranchWidth, "Branch",
 		maxStatusWidth, "Status",
-		maxLastUpdatedWidth, "Last Updated")
+		maxLastUpdatedWidth, "Last Updated",
+		maxCommitCountWidth, "Commits")
 	if _, err := io.WriteString(w, headerRow); err != nil {
 		return err
 	}
 
 	// Write separator row with uniform width
-	separatorRow := fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
+	separatorRow := fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
 		strings.Repeat("-", maxPathWidth),
 		strings.Repeat("-", maxURLWidth),
 		strings.Repeat("-", maxBranchWidth),
 		strings.Repeat("-", maxStatusWidth),
-		strings.Repeat("-", maxLastUpdatedWidth))
+		strings.Repeat("-", maxLastUpdatedWidth),
+		strings.Repeat("-", maxCommitCountWidth))
 	if _, err := io.WriteString(w, separatorRow); err != nil {
 		return err
 	}
@@ -233,12 +244,13 @@ func outputTable(w io.Writer, repos []repoInfo) error {
 			status = "modified"
 		}
 
-		row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s |\n",
+		row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*d |\n",
 			maxPathWidth, repo.Path,
 			maxURLWidth, repo.URL,
 			maxBranchWidth, repo.Branch,
 			maxStatusWidth, status,
-			maxLastUpdatedWidth, repo.LastUpdated.Format(lastUpdatedFormat))
+			maxLastUpdatedWidth, repo.LastUpdated.Format(lastUpdatedFormat),
+			maxCommitCountWidth, repo.CommitCount)
 		if _, err := io.WriteString(w, row); err != nil {
 			return err
 		}
