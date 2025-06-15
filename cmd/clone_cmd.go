@@ -110,8 +110,14 @@ func parseCloneArgs(args []string) (cloneOptions, error) {
 	urlArgsLastIndex := 0
 
 	for i, arg := range args {
+		// check if URL has a scheme, if not prepend 'https://'
+		urlArg := arg
+		if !hasScheme(arg) {
+			urlArg = "https://" + arg
+		}
+
 		// parse URI
-		parsedURI, err := url.ParseRequestURI(arg)
+		parsedURI, err := url.ParseRequestURI(urlArg)
 		if err != nil {
 			// last argument might be path
 			if i == len(args)-1 {

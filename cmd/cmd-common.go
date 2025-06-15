@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,11 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/tevino/abool/v2"
 )
+
+// hasScheme checks if the given URL string has a scheme defined
+func hasScheme(urlStr string) bool {
+	return len(urlStr) > 0 && (bytes.Contains([]byte(urlStr), []byte("://")))
+}
 
 func printProjectInfoContext(ctx context.Context) {
 	if printProjectInfoHeaderFn, ok := ctx.Value(ctxKeyPrintProjectInfoHeaderFn{}).(func()); ok {
