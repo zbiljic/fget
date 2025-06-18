@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zbiljic/fget/pkg/gitexec"
+	"github.com/zbiljic/gitexec"
 )
 
 func gitRepoPathPull(repoPath string) ([]byte, error) {
@@ -82,11 +82,7 @@ func gitRepoDiff(repoPath string) ([]byte, error) {
 }
 
 func gitRepoIgnoreFileMode(repoPath string) ([]byte, error) {
-	out, err := gitexec.Config(&gitexec.ConfigOptions{
-		CmdDir: repoPath,
-		Name:   "core.filemode",
-		Value:  "false",
-	})
+	out, err := gitexec.Command(repoPath, "config", "core.filemode", "false")
 	if err != nil {
 		return out, err
 	}
@@ -96,9 +92,9 @@ func gitRepoIgnoreFileMode(repoPath string) ([]byte, error) {
 
 func gitRepoCommitCount(repoPath string) (int, error) {
 	out, err := gitexec.RevList(&gitexec.RevListOptions{
-		CmdDir:   repoPath,
-		Count:    true,
-		Revision: "HEAD",
+		CmdDir: repoPath,
+		Count:  true,
+		Commit: "HEAD",
 	})
 	if err != nil {
 		return 0, err

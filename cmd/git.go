@@ -27,9 +27,9 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/tevino/abool/v2"
 	giturls "github.com/whilp/git-urls"
+	"github.com/zbiljic/gitexec"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
-	"github.com/zbiljic/fget/pkg/gitexec"
 	"github.com/zbiljic/fget/pkg/rhttp"
 )
 
