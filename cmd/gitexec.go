@@ -108,3 +108,15 @@ func gitRepoCommitCount(repoPath string) (int, error) {
 
 	return count, nil
 }
+
+func gitRepoLsRemote(repoPath string) ([]byte, error) {
+	out, err := gitexec.LsRemote(&gitexec.LsRemoteOptions{
+		CmdDir: repoPath,
+		Symref: true,
+	})
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
+}

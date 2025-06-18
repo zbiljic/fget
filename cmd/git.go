@@ -27,7 +27,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/tevino/abool/v2"
 	giturls "github.com/whilp/git-urls"
-	"github.com/zbiljic/gitexec"
 
 	"github.com/zbiljic/fget/pkg/fsfind"
 	"github.com/zbiljic/fget/pkg/rhttp"
@@ -626,10 +625,7 @@ func gitFindRemoteHeadReference(ctx context.Context, repoPath string) (*plumbing
 		return nil, ErrGitRepositoryNotReachable
 	}
 
-	out, err := gitexec.LsRemote(&gitexec.LsRemoteOptions{
-		CmdDir: repoPath,
-		Symref: true,
-	})
+	out, err := gitRepoLsRemote(repoPath)
 	if err != nil {
 		outString := string(out)
 		outString = strings.ToLower(outString)
