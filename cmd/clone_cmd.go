@@ -130,6 +130,10 @@ func parseCloneArgs(args []string) (cloneOptions, error) {
 			continue
 		}
 
+		// remove query and fragment
+		parsedURI.RawQuery = ""
+		parsedURI.RawFragment = ""
+
 		opts.URLs = append(opts.URLs, parsedURI)
 		urlArgsLastIndex = i
 	}
