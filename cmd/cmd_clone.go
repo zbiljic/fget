@@ -155,7 +155,7 @@ func parseCloneArgs(args []string) (cloneOptions, error) {
 
 	if opts.RootDirectory == "" {
 		// fallback to current working directory
-		opts.RootDirectory = GetWd()
+		opts.RootDirectory = getWd()
 	}
 
 	return opts, nil

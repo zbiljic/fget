@@ -193,7 +193,7 @@ func parseFixArgs(args []string) (fixOptions, error) {
 		}
 	} else {
 		// fallback to current working directory
-		opts.Roots = append(opts.Roots, GetWd())
+		opts.Roots = append(opts.Roots, getWd())
 	}
 
 	return opts, nil

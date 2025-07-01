@@ -5,12 +5,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/pterm/pterm"
+	"github.com/spf13/cobra"
 	"github.com/tevino/abool/v2"
 )
+
+// getWd is a convenience method to get the working directory.
+func getWd() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("getting working directory: %w", err))
+	}
+	return dir
+}
 
 // hasScheme checks if the given URL string has a scheme defined
 func hasScheme(urlStr string) bool {

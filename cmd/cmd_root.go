@@ -44,7 +44,7 @@ func Execute() {
 			cmd.Usage() //nolint:errcheck
 		}
 
-		ExitIfErr(os.Stderr, err)
+		cobra.CheckErr(err)
 	}
 }
 
