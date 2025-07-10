@@ -91,7 +91,12 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	spinner.Stop() //nolint:errcheck
+	// For text output, stop spinner early since we print immediately
+	if opts.OutputFormat == OutputFormatText {
+		spinner.Stop() //nolint:errcheck
+	} else {
+		spinner.UpdateText("processing repositories...")
+	}
 
 	var repos []repoInfo
 
@@ -137,6 +142,11 @@ func runList(cmd *cobra.Command, args []string) error {
 		default:
 			pterm.Println(project)
 		}
+	}
+
+	// Stop spinner after processing is complete for non-text formats
+	if opts.OutputFormat != OutputFormatText {
+		spinner.Stop() //nolint:errcheck
 	}
 
 	switch opts.OutputFormat {
