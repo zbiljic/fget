@@ -1,13 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"dario.cat/mergo"
+	"github.com/alitto/pond"
+	art "github.com/plar/go-adaptive-radix-tree/v2"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/thediveo/enumflag/v2"
@@ -43,6 +47,7 @@ var OutputFormatIds = map[OutputFormat][]string{
 
 var listCmdFlags = listOptions{
 	OutputFormat: OutputFormatText,
+	MaxWorkers:   poolDefaultMaxWorkers,
 }
 
 func init() {
@@ -52,11 +57,13 @@ func init() {
 		enumflag.New(&listCmdFlags.OutputFormat, "output", OutputFormatIds, enumflag.EnumCaseInsensitive),
 		"output", "o",
 		"Output format: text|json|table")
+	listCmd.Flags().Uint16VarP(&listCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
 }
 
 type listOptions struct {
 	Roots        []string
 	OutputFormat OutputFormat
+	MaxWorkers   uint16
 }
 
 type repoInfo struct {
@@ -94,69 +101,142 @@ func runList(cmd *cobra.Command, args []string) error {
 	// For text output, stop spinner early since we print immediately
 	if opts.OutputFormat == OutputFormatText {
 		spinner.Stop() //nolint:errcheck
-	} else {
-		spinner.UpdateText("processing repositories...")
+		return runListTextOutput(repoPaths)
 	}
 
-	var repos []repoInfo
+	// For other formats, we need to gather detailed info
+	spinner.UpdateText("processing repositories...")
 
+	return runListDetailedOutput(cmd.Context(), repoPaths, opts, func() {
+		spinner.Stop() //nolint:errcheck
+	})
+}
+
+// runListTextOutput prints the project names for each repository
+func runListTextOutput(repoPaths art.Tree) error {
 	for it := repoPaths.Iterator(); it.HasNext(); {
 		node, _ := it.Next()
 		repoPath := string(node.Key())
 
-		project, url, ref, err := gitProjectInfo(repoPath)
+		project, _, _, err := gitProjectInfo(repoPath)
 		if err != nil {
 			return err
 		}
 
-		switch opts.OutputFormat {
-		case OutputFormatJSON, OutputFormatTable:
-			branch := ""
-			if ref != nil {
-				branch = ref.Name().Short()
-			}
-
-			isClean, err := gitIsClean(cmd.Context(), repoPath)
-			if err != nil {
-				return err
-			}
-
-			lastUpdated, err := gitLastCommitDate(repoPath)
-			if err != nil {
-				return err
-			}
-
-			commitCount, err := gitRepoCommitCount(repoPath)
-			if err != nil {
-				return err
-			}
-
-			repos = append(repos, repoInfo{
-				Path:        project,
-				URL:         url,
-				Branch:      branch,
-				IsClean:     isClean,
-				LastUpdated: lastUpdated,
-				CommitCount: commitCount,
-			})
-		default:
-			pterm.Println(project)
-		}
-	}
-
-	// Stop spinner after processing is complete for non-text formats
-	if opts.OutputFormat != OutputFormatText {
-		spinner.Stop() //nolint:errcheck
-	}
-
-	switch opts.OutputFormat {
-	case OutputFormatJSON:
-		return outputJSON(cmd.OutOrStdout(), repos)
-	case OutputFormatTable:
-		return outputTable(cmd.OutOrStdout(), repos)
+		pterm.Println(project)
 	}
 
 	return nil
+}
+
+// runListDetailedOutput gathers detailed info for each repository
+// and prints it in the specified format
+func runListDetailedOutput(
+	ctx context.Context,
+	repoPaths art.Tree,
+	opts listOptions,
+	beforeOutput func(),
+) error {
+	// convert iterator to slice for parallel processing
+	var repoPathSlice []string
+	for it := repoPaths.Iterator(); it.HasNext(); {
+		node, _ := it.Next()
+		repoPathSlice = append(repoPathSlice, string(node.Key()))
+	}
+
+	// worker pool
+	pool := pond.New(int(opts.MaxWorkers), poolDefaultMaxCapacity)
+	defer pool.StopAndWait()
+
+	// task group associated to a context
+	group, ctx := pool.GroupContext(ctx)
+
+	// channel to collect results
+	results := make(chan repoInfo, len(repoPathSlice))
+	var resultsMutex sync.Mutex
+	var repos []repoInfo
+
+	for _, repoPath := range repoPathSlice {
+		task := func() error {
+			repo, err := processRepoInfo(repoPath)
+			if err != nil {
+				return err
+			}
+
+			results <- repo
+			return nil
+		}
+
+		group.Submit(task)
+	}
+
+	// collect results as they complete
+	go func() {
+		for i := 0; i < len(repoPathSlice); i++ {
+			select {
+			case repo := <-results:
+				resultsMutex.Lock()
+				repos = append(repos, repo)
+				resultsMutex.Unlock()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	if err := group.Wait(); err != nil {
+		return err
+	}
+
+	// Call the beforeOutput callback after all processing is complete
+	// but before printing output
+	beforeOutput()
+
+	// Output based on format
+	switch opts.OutputFormat {
+	case OutputFormatJSON:
+		return outputJSON(pterm.DefaultBasicText.WithWriter(dynamicOutput).Writer, repos)
+	case OutputFormatTable:
+		return outputTable(pterm.DefaultBasicText.WithWriter(dynamicOutput).Writer, repos)
+	}
+
+	return nil
+}
+
+func processRepoInfo(repoPath string) (repoInfo, error) {
+	project, url, ref, err := gitProjectInfo(repoPath)
+	if err != nil {
+		return repoInfo{}, err
+	}
+
+	branch := ""
+	if ref != nil {
+		branch = ref.Name().Short()
+	}
+
+	isClean, err := gitIsClean(context.Background(), repoPath)
+	if err != nil {
+		return repoInfo{}, err
+	}
+
+	lastUpdated, err := gitLastCommitDate(repoPath)
+	if err != nil {
+		return repoInfo{}, err
+	}
+
+	commitCount, err := gitRepoCommitCount(repoPath)
+	if err != nil {
+		return repoInfo{}, err
+	}
+
+	return repoInfo{
+		Path:        project,
+		URL:         url,
+		Branch:      branch,
+		IsClean:     isClean,
+		LastUpdated: lastUpdated,
+		CommitCount: commitCount,
+	}, nil
 }
 
 func parseListArgs(args []string) (listOptions, error) {
