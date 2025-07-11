@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,7 @@ var OutputFormatIds = map[OutputFormat][]string{
 var listCmdFlags = listOptions{
 	OutputFormat: OutputFormatText,
 	MaxWorkers:   poolDefaultMaxWorkers,
+	SortBy:       "", // No sorting by default
 }
 
 func init() {
@@ -58,12 +60,15 @@ func init() {
 		"output", "o",
 		"Output format: text|json|table")
 	listCmd.Flags().Uint16VarP(&listCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
+	listCmd.Flags().StringVarP(&listCmdFlags.SortBy, "sort", "s", "",
+		"Sort repositories by: [±]time|[±]name|[±]commits (prefix with - for reverse order)")
 }
 
 type listOptions struct {
 	Roots        []string
 	OutputFormat OutputFormat
 	MaxWorkers   uint16
+	SortBy       string // Format: [±]field (e.g., "time", "-time", "name", etc.)
 }
 
 type repoInfo struct {
@@ -186,6 +191,47 @@ func runListDetailedOutput(
 
 	if err := group.Wait(); err != nil {
 		return err
+	}
+
+	// Sort repositories if requested
+	if opts.SortBy != "" && len(repos) > 0 {
+		reverse := false
+		field := opts.SortBy
+
+		// Check if reverse order is requested (prefixed with -)
+		if strings.HasPrefix(field, "-") {
+			reverse = true
+			field = field[1:]
+		} else if strings.HasPrefix(field, "+") {
+			// Explicit ascending order (optional + prefix)
+			field = field[1:]
+		}
+
+		// Sort based on the specified field
+		sort.Slice(repos, func(i, j int) bool {
+			var result bool
+
+			switch field {
+			case "time", "date", "updated":
+				// Sort by last update time
+				result = repos[i].LastUpdated.After(repos[j].LastUpdated)
+			case "name", "path":
+				// Sort by repository name/path
+				result = repos[i].Path < repos[j].Path
+			case "commits", "count":
+				// Sort by commit count
+				result = repos[i].CommitCount > repos[j].CommitCount
+			default:
+				// Default to sorting by path
+				result = repos[i].Path < repos[j].Path
+			}
+
+			// Reverse the result if requested
+			if reverse {
+				return !result
+			}
+			return result
+		})
 	}
 
 	// Call the beforeOutput callback after all processing is complete
