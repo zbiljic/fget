@@ -7,6 +7,8 @@ on:
       - renovate/**
     tags:
       - v*
+    paths-ignore:
+      - "**.md"
   pull_request:
     paths-ignore:
       - "**.md"
@@ -18,7 +20,7 @@ permissions:
 jobs:
   golangci:
     name: lint
-    runs-on: ubuntu-22.04
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +33,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: false
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
