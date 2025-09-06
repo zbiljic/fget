@@ -15,7 +15,7 @@ require (
 	github.com/plar/go-adaptive-radix-tree/v2 v2.0.3
 	github.com/pterm/pterm v0.12.81
 	github.com/samber/lo v1.51.0
-	github.com/spf13/cobra v1.9.1
+	github.com/spf13/cobra v1.10.1
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/thediveo/enumflag/v2 v2.0.7
 	github.com/whilp/git-urls v1.0.0
@@ -46,7 +46,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.37.0 // indirect
