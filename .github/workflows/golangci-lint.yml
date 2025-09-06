@@ -30,7 +30,7 @@ jobs:
         run: |
           echo "GO_VERSION=$(cat go.mod | sed -En 's/go ([0-9.]+)/\1/p' | tr -d '[:blank:]')" >> $GITHUB_ENV
           echo "GOLANGCI_LINT_VERSION=$(cat mise.toml | sed -En 's/golangci-lint.+"(.*)"/\1/p')" >> $GITHUB_ENV
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: golangci-lint
