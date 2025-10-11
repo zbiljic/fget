@@ -14,7 +14,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/plar/go-adaptive-radix-tree/v2 v2.0.3
 	github.com/pterm/pterm v0.12.81
-	github.com/samber/lo v1.51.0
+	github.com/samber/lo v1.52.0
 	github.com/spf13/cobra v1.10.1
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/thediveo/enumflag/v2 v2.0.7
