@@ -8,7 +8,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
-	github.com/go-git/go-billy/v5 v5.6.2
+	github.com/go-git/go-billy/v5 v5.7.0
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/mattn/go-isatty v0.0.20
