@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	dario.cat/mergo v1.0.2
 	github.com/alitto/pond v1.9.2
-	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
 	github.com/go-git/go-billy/v5 v5.7.0
