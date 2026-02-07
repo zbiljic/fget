@@ -756,7 +756,7 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 	exp := backoff.NewExponentialBackOff()
 	exp.InitialInterval = retryWaitMin
 	exp.MaxInterval = retryWaitMax
-	exp.MaxElapsedTime = retryMaxElapsedTime
+	start := time.Now()
 
 	var attempt int
 	var err error
@@ -863,12 +863,20 @@ func gitCheckAndPull(ctx context.Context, repoPath string) error {
 			exp.Reset()
 		}
 
+		elapsed := time.Since(start)
+		if elapsed >= retryMaxElapsedTime {
+			break
+		}
+
 		wait := exp.NextBackOff()
 		if wait == backoff.Stop {
 			break
 		}
 
-		remain := retryMaxElapsedTime - exp.GetElapsedTime()
+		remain := retryMaxElapsedTime - elapsed
+		if wait > remain {
+			wait = remain
+		}
 
 		prefixPrinter.Printfln("retrying in %s (%s left)", wait.Round(time.Millisecond), remain.Round(time.Second))
 
