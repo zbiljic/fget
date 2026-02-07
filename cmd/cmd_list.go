@@ -3,15 +3,16 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"dario.cat/mergo"
 	"github.com/alitto/pond/v2"
+	"github.com/go-git/go-git/v5"
 	art "github.com/plar/go-adaptive-radix-tree/v2"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -125,6 +126,10 @@ func runListTextOutput(repoPaths art.Tree) error {
 
 		project, _, _, err := gitProjectInfo(repoPath)
 		if err != nil {
+			if isListSkippableRepoError(err) {
+				continue
+			}
+
 			return err
 		}
 
@@ -149,49 +154,39 @@ func runListDetailedOutput(
 		repoPathSlice = append(repoPathSlice, string(node.Key()))
 	}
 
-	// worker pool
-	pool := pond.NewPool(int(opts.MaxWorkers), pond.WithQueueSize(poolDefaultMaxCapacity))
-	defer pool.StopAndWait()
+	resultPool := pond.NewResultPool[*repoInfo](
+		int(opts.MaxWorkers),
+		pond.WithQueueSize(poolDefaultMaxCapacity),
+	)
+	defer resultPool.StopAndWait()
 
-	// task group associated to a context
-	group := pool.NewGroupContext(ctx)
-	groupCtx := group.Context()
-
-	// channel to collect results
-	results := make(chan repoInfo, len(repoPathSlice))
-	var resultsMutex sync.Mutex
-	var repos []repoInfo
+	group := resultPool.NewGroupContext(ctx)
 
 	for _, repoPath := range repoPathSlice {
-		task := func() error {
+		group.SubmitErr(func() (*repoInfo, error) {
 			repo, err := processRepoInfo(repoPath)
 			if err != nil {
-				return err
+				if isListSkippableRepoError(err) {
+					return nil, nil
+				}
+
+				return nil, err
 			}
 
-			results <- repo
-			return nil
-		}
-
-		group.SubmitErr(task)
+			return &repo, nil
+		})
 	}
 
-	// collect results as they complete
-	go func() {
-		for i := 0; i < len(repoPathSlice); i++ {
-			select {
-			case repo := <-results:
-				resultsMutex.Lock()
-				repos = append(repos, repo)
-				resultsMutex.Unlock()
-			case <-groupCtx.Done():
-				return
-			}
-		}
-	}()
-
-	if err := group.Wait(); err != nil {
+	repoResults, err := group.Wait()
+	if err != nil {
 		return err
+	}
+
+	repos := make([]repoInfo, 0, len(repoResults))
+	for _, repo := range repoResults {
+		if repo != nil {
+			repos = append(repos, *repo)
+		}
 	}
 
 	// Sort repositories if requested
@@ -284,6 +279,10 @@ func processRepoInfo(repoPath string) (repoInfo, error) {
 		LastUpdated: lastUpdated,
 		CommitCount: commitCount,
 	}, nil
+}
+
+func isListSkippableRepoError(err error) bool {
+	return errors.Is(err, git.ErrRemoteNotFound)
 }
 
 func parseListArgs(args []string) (listOptions, error) {
