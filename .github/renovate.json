@@ -1,0 +1,37 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":combinePatchMinorReleases",
+    ":separateMultipleMajorReleases",
+    "customManagers:githubActionsVersions"
+  ],
+  "schedule": ["* 0-6 * * 1"],
+  "enabledManagers": ["custom.regex", "github-actions", "gomod", "mise"],
+  "packageRules": [
+    {
+      "description": ["Automerge non-major updates"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "automergeStrategy": "rebase",
+      "automergeType": "branch"
+    },
+    {
+      "description": ["Use ci semantic type for some deps"],
+      "matchFileNames": [".github/workflows/**"],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": ["Update the Renovate GitHub action weekly with fix type"],
+      "extends": [":semanticCommitType(fix)"],
+      "matchPackageNames": ["renovatebot/github-action"],
+      "semanticCommitType": "ci",
+      "schedule": ["* 0-3 * * 1"]
+    },
+    {
+      "description": ["Update Go dependencies"],
+      "matchManagers": ["gomod"],
+      "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"]
+    }
+  ]
+}
