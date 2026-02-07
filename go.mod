@@ -20,7 +20,7 @@ require (
 	github.com/thediveo/enumflag/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
 	github.com/zbiljic/gitexec v0.0.0-20250617074444-bf43387cda0f
-	golang.org/x/exp v0.0.0-20250103183323-7d7fa50e5329
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 )
 
 require (
