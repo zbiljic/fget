@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"dario.cat/mergo"
-	"github.com/alitto/pond"
+	"github.com/alitto/pond/v2"
 	art "github.com/plar/go-adaptive-radix-tree/v2"
 	"github.com/pterm/pterm"
 	"github.com/samber/lo"
@@ -133,7 +133,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	startOffset := 1 + config.TotalCount - len(activeRepoPaths)
 
 	// worker pool
-	pool := pond.New(int(opts.MaxWorkers), poolDefaultMaxCapacity)
+	pool := pond.NewPool(int(opts.MaxWorkers), pond.WithQueueSize(poolDefaultMaxCapacity))
 	defer pool.StopAndWait()
 
 	ctx := cmd.Context()
@@ -146,7 +146,8 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// task group associated to a context
-	group, ctx := pool.GroupContext(ctx)
+	group := pool.NewGroupContext(ctx)
+	groupCtx := group.Context()
 
 	for i, path := range config.Paths {
 		i := i + startOffset
@@ -154,11 +155,11 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		repoPath := path
 
 		// context setup
-		ctx = context.WithValue(ctx, ctxKeyDryRun{}, opts.DryRun)
-		ctx = context.WithValue(ctx, ctxKeyOnlyUpdated{}, opts.OnlyUpdated)
+		taskCtx := context.WithValue(groupCtx, ctxKeyDryRun{}, opts.DryRun)
+		taskCtx = context.WithValue(taskCtx, ctxKeyOnlyUpdated{}, opts.OnlyUpdated)
 
 		task := taskUpdateFn(
-			ctx,
+			taskCtx,
 			cmdName,
 			config,
 			i,
@@ -167,7 +168,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			cleanupFn,
 		)
 
-		group.Submit(task)
+		group.SubmitErr(task)
 	}
 
 	if err := group.Wait(); err != nil {

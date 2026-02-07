@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"dario.cat/mergo"
-	"github.com/alitto/pond"
+	"github.com/alitto/pond/v2"
 	art "github.com/plar/go-adaptive-radix-tree/v2"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -150,11 +150,12 @@ func runListDetailedOutput(
 	}
 
 	// worker pool
-	pool := pond.New(int(opts.MaxWorkers), poolDefaultMaxCapacity)
+	pool := pond.NewPool(int(opts.MaxWorkers), pond.WithQueueSize(poolDefaultMaxCapacity))
 	defer pool.StopAndWait()
 
 	// task group associated to a context
-	group, ctx := pool.GroupContext(ctx)
+	group := pool.NewGroupContext(ctx)
+	groupCtx := group.Context()
 
 	// channel to collect results
 	results := make(chan repoInfo, len(repoPathSlice))
@@ -172,7 +173,7 @@ func runListDetailedOutput(
 			return nil
 		}
 
-		group.Submit(task)
+		group.SubmitErr(task)
 	}
 
 	// collect results as they complete
@@ -183,7 +184,7 @@ func runListDetailedOutput(
 				resultsMutex.Lock()
 				repos = append(repos, repo)
 				resultsMutex.Unlock()
-			case <-ctx.Done():
+			case <-groupCtx.Done():
 				return
 			}
 		}
