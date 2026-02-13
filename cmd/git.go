@@ -1286,6 +1286,90 @@ func gitIsDiffFileMode(ctx context.Context, repoPath string) (bool, error) {
 	return false, nil
 }
 
+func gitReclone(ctx context.Context, repoPath string) error {
+	remoteURL, err := gitRemoteConfigURL(repoPath)
+	if err != nil {
+		return err
+	}
+
+	cleanRepoPath := filepath.Clean(repoPath)
+	if cleanRepoPath == "." || cleanRepoPath == string(filepath.Separator) {
+		return fmt.Errorf("unsafe repository path: %s", repoPath)
+	}
+
+	// complicated update locking
+	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
+		if isUpdateMutexLocked.IsNotSet() {
+			updateMutex.Lock()
+			isUpdateMutexLocked.Set()
+		}
+	} else {
+		// simple
+		updateMutex.Lock()
+	}
+	if shouldUpdateMutexUnlock, ok := ctx.Value(ctxKeyShouldUpdateMutexUnlock{}).(bool); ok {
+		if shouldUpdateMutexUnlock {
+			defer updateMutex.Unlock()
+		}
+	} else {
+		// simple
+		defer updateMutex.Unlock()
+	}
+
+	printProjectInfoContext(ctx)
+
+	dryRun, _ := ctx.Value(ctxKeyDryRun{}).(bool)
+
+	prefixPrinter := ptermWarningWithPrefixText("reclone")
+
+	prefixPrinter.Printf("'%s'", remoteURL.String())
+	pterm.Print(": ")
+
+	if dryRun {
+		ptermSuccessMessageStyle.Println("dry-run")
+		return nil
+	}
+
+	out, err := gitRepoLsRemote(repoPath)
+	if err != nil {
+		if len(out) > 0 {
+			err = fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+		}
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	if err := os.RemoveAll(repoPath); err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(repoPath), os.ModePerm); err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	buf := bytes.NewBuffer(nil)
+
+	_, err = git.PlainClone(repoPath, false, &git.CloneOptions{
+		URL:      remoteURL.String(),
+		Progress: buf,
+	})
+	if err != nil {
+		ptermErrorMessageStyle.Println(err.Error())
+		return err
+	}
+
+	ptermSuccessMessageStyle.Println("success")
+
+	if buf.Len() > 0 {
+		pterm.Println()
+		pterm.Println(buf.String())
+	}
+
+	return nil
+}
+
 func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
 	// complicated update locking
 	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {

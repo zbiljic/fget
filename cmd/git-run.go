@@ -82,3 +82,11 @@ func gitRunGc(ctx context.Context, repoPath string) error {
 
 	return nil
 }
+
+func gitRunReclone(ctx context.Context, repoPath string) error {
+	if err := gitReclone(ctx, repoPath); err != nil {
+		return err
+	}
+
+	return nil
+}

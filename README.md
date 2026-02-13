@@ -21,6 +21,7 @@ Do you have hundreds or thousands of repos cloned locally? Keeping them updated,
     -   Repairs broken or invalid local references.
 -   **Moved Repository Detection:** If a repository moves on the server (e.g., a user or organization rename on GitHub), `fget` detects the HTTP redirect and automatically renames your local directory and updates the remote URL.
 -   **Efficient `gc`:** Run `git gc` concurrently across all your repositories to optimize their local storage.
+-   **Safe `reclone`:** Re-clone repositories from scratch with an interactive confirmation prompt (or `--yes` to skip confirmation).
 -   **Single Binary:** No dependencies, no runtime. Just a single executable file.
 
 ## Installation
@@ -105,6 +106,21 @@ This runs `git gc --prune=all` to clean up and optimize the local repositories.
 ```sh
 # Run garbage collection on all repositories under ~/src
 fget gc ~/src
+```
+
+### `reclone`: Re-clone repositories from scratch
+
+This command first verifies remote access, then removes each provided local repository directory and clones it again from its configured `origin` URL.
+
+```sh
+# Interactive confirmation prompt before destructive action
+fget reclone ~/src/github.com/zbiljic/fget
+
+# Skip confirmation prompt (works in terminal and scripts)
+fget reclone ~/src/github.com/zbiljic/fget ~/src/github.com/spf13/cobra --yes
+
+# Alias
+fget reset ~/src/github.com/zbiljic/fget --yes
 ```
 
 ### `list`: List all managed repositories
