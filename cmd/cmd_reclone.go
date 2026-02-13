@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,6 +50,12 @@ func runReclone(cmd *cobra.Command, args []string) error {
 
 	if opts.DryRun {
 		opts.AssumeYes = true
+	}
+
+	if !opts.DryRun {
+		if err := ensureCwdOutsideTargets(opts.RepoPaths); err != nil {
+			return err
+		}
 	}
 
 	if err := confirmReclone(opts); err != nil {
@@ -138,4 +146,66 @@ func confirmReclone(opts recloneOptions) error {
 	}
 
 	return nil
+}
+
+func ensureCwdOutsideTargets(repoPaths []string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	for _, repoPath := range repoPaths {
+		inside, err := isPathWithin(repoPath, cwd)
+		if err != nil {
+			return err
+		}
+
+		if inside {
+			return fmt.Errorf("current working directory '%s' is inside target repository '%s'; run reclone from outside the target repository", cwd, repoPath)
+		}
+	}
+
+	return nil
+}
+
+func isPathWithin(basePath, targetPath string) (bool, error) {
+	baseAbsPath, err := normalizePath(basePath)
+	if err != nil {
+		return false, err
+	}
+
+	targetAbsPath, err := normalizePath(targetPath)
+	if err != nil {
+		return false, err
+	}
+
+	relPath, err := filepath.Rel(baseAbsPath, targetAbsPath)
+	if err != nil {
+		return false, err
+	}
+
+	if relPath == "." {
+		return true, nil
+	}
+
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func normalizePath(path string) (string, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	normalizedPath, err := filepath.EvalSymlinks(absPath)
+	if err == nil {
+		return normalizedPath, nil
+	}
+
+	// Path might not exist; absolute path is still useful for containment checks.
+	return absPath, nil
 }
