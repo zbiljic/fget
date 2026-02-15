@@ -3,6 +3,7 @@ package vconfig
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -184,5 +185,59 @@ func TestSaveLoad(t *testing.T) {
 	mismatch := myStruct{"1.1", "guest", "nopassword", []string{"Work", "Documents", "Music"}}
 	if reflect.DeepEqual(&saveMe, &mismatch) {
 		t.Fatal("Expected to mismatch but succeeded instead")
+	}
+}
+
+func TestSaveLoadYAML(t *testing.T) {
+	t.Parallel()
+
+	type myStruct struct {
+		Version string   `yaml:"version"`
+		Roots   []string `yaml:"roots"`
+	}
+
+	filename := "test.yaml"
+	defer os.Remove(filename) //nolint:errcheck
+
+	saveMe := myStruct{
+		Version: "1",
+		Roots:   []string{"/tmp/a", "/tmp/b"},
+	}
+
+	if err := SaveConfig(&saveMe, filename); err != nil {
+		t.Fatalf("SaveConfig() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(data), "version:") {
+		t.Fatalf("SaveConfig() expected YAML output, got: %s", string(data))
+	}
+	if strings.HasPrefix(strings.TrimSpace(string(data)), "{") {
+		t.Fatalf("SaveConfig() expected YAML output, got JSON: %s", string(data))
+	}
+
+	loadMe, err := LoadConfig[myStruct](filename)
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(&saveMe, loadMe) {
+		t.Fatalf("Expected %v, got %v", &saveMe, loadMe)
+	}
+
+	rawYAML := "version: \"1\"\nroots:\n  - /tmp/c\n"
+	if err := os.WriteFile(filename, []byte(rawYAML), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	loadMe, err = LoadConfig[myStruct](filename)
+	if err != nil {
+		t.Fatalf("LoadConfig() YAML parse error = %v", err)
+	}
+	if !reflect.DeepEqual(loadMe.Roots, []string{"/tmp/c"}) {
+		t.Fatalf("LoadConfig() roots mismatch: got %v", loadMe.Roots)
 	}
 }

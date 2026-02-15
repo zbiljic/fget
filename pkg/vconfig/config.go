@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -52,7 +53,12 @@ func LoadConfig[T any](filename string) (*T, error) {
 		data = []byte(strings.ReplaceAll(string(data), "\r\n", "\n"))
 	}
 
-	config, err := jsonUnmarshalAny[T](data)
+	var config *T
+	if hasYAMLExtension(filename) {
+		config, err = yamlUnmarshalAny[T](data)
+	} else {
+		config, err = jsonUnmarshalAny[T](data)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +76,15 @@ func SaveConfig(config any, filename string) error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(config, "", "\t")
+	var (
+		data []byte
+		err  error
+	)
+	if hasYAMLExtension(filename) {
+		data, err = yamlMarshal(config)
+	} else {
+		data, err = json.MarshalIndent(config, "", "\t")
+	}
 	if err != nil {
 		return err
 	}
@@ -80,4 +94,9 @@ func SaveConfig(config any, filename string) error {
 	}
 
 	return os.WriteFile(filename, data, 0o644)
+}
+
+func hasYAMLExtension(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	return ext == ".yaml" || ext == ".yml"
 }
