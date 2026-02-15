@@ -1,0 +1,187 @@
+[env]
+_.source = { path = ".config/mise/scripts/go-mod-env.sh", tools = true }
+
+[tasks."go:mod:tidy:relaxed"]
+description = "Run go mod tidy in relaxed mode"
+hide = true
+run = '''
+  set -e
+  if [ -z "${GO_MOD_COMPAT:-}" ]; then
+    echo >&2 "GO_MOD_COMPAT is empty. Ensure go.mod contains a Go version or set GO_MOD_COMPAT."
+    exit 1
+  fi
+  go mod tidy -e -compat="$GO_MOD_COMPAT"
+'''
+
+[tasks."go:mod:tidy:strict"]
+description = "Run go mod tidy in strict mode"
+hide = true
+run = '''
+  set -e
+  if [ -z "${GO_MOD_COMPAT:-}" ]; then
+    echo >&2 "GO_MOD_COMPAT is empty. Ensure go.mod contains a Go version or set GO_MOD_COMPAT."
+    exit 1
+  fi
+  go mod tidy -compat="$GO_MOD_COMPAT"
+'''
+
+[tasks."go:mod:tidy"]
+description = "Run go mod tidy using GO_MOD_COMPAT"
+run = [{ task = "go:mod:tidy:relaxed" }, { task = "go:mod:tidy:strict" }]
+
+[tasks."go:mod:lint"]
+description = "Lint Go module files"
+depends = ["go:mod:tidy"]
+run = '''
+  if git status --porcelain | grep -Eq 'go\.(mod|sum|work)'; then
+    echo "go.mod or go.sum needs updating"
+    git --no-pager diff go.mod || true
+    git --no-pager diff go.sum || true
+    exit 1
+  fi
+'''
+
+[tasks."go:fmt"]
+description = "Format Go code with gofumpt"
+run = "gofumpt -extra -l -w ."
+
+[tasks."go:lint"]
+description = "Lint Go source and verify module files are tidy"
+run = '''
+  set -e
+  lint_config="${GOLANGCI_CONFIG:-}"
+  if [ -z "$lint_config" ]; then
+    if [ -f ".golangci.yml" ]; then
+      lint_config=".golangci.yml"
+    elif [ -f ".golangci.yaml" ]; then
+      lint_config=".golangci.yaml"
+    fi
+  fi
+
+  if [ -n "$lint_config" ]; then
+    golangci-lint run --config="$lint_config" --fix
+  else
+    golangci-lint run --fix
+  fi
+'''
+
+[tasks."go:generate"]
+description = "Generate code from Go directives"
+run = '''
+  if [ "${CI:-}" = "true" ]; then
+    go generate ./...
+  else
+    go generate -x ./...
+  fi
+'''
+
+[tasks."go:test"]
+description = "Run Go tests with coverage"
+usage = '''
+flag "--race" env="ENABLE_RACE" help="Enable the race detector (prefer this over ENABLE_RACE)"
+flag "-v --verbose" env="VERBOSE" help="Enable verbose output"
+flag "--runner <runner>" help="Test runner implementation" default="go" {
+  choices "go" "gotestsum"
+}
+flag "--count <count>" help="Run each test and benchmark n times (use 1 to disable test caching for this run)"
+flag "--timeout <duration>" help="Go test timeout" default="15m"
+flag "--coverprofile <file>" help="Coverage profile output file" default="unit.coverprofile"
+flag "--covermode <mode>" help="Coverage mode (auto when omitted with --race)" {
+  choices "set" "count" "atomic"
+}
+flag "--packages <packages>" help="Package pattern(s) passed to go test" default="./..."
+'''
+run = '''
+  set -e
+
+  test_packages="${usage_packages?}"
+  test_timeout="${usage_timeout?}"
+  test_coverprofile="${usage_coverprofile?}"
+  test_covermode="${usage_covermode:-}"
+  test_count="${usage_count:-}"
+  test_race="${usage_race:-false}"
+  test_runner="${usage_runner:-go}"
+  test_verbose="${usage_verbose:-false}"
+
+  test_args="-cover -coverprofile=${test_coverprofile} -timeout=${test_timeout} ${test_packages}"
+
+  if [ "$test_race" = "true" ]; then
+    test_args="-race ${test_args}"
+    if [ -z "$test_covermode" ]; then
+      test_covermode="atomic"
+    fi
+    if [ -n "${GOPATH:-}" ] && [ -z "${GORACE:-}" ]; then
+      export GORACE="strip_path_prefix=${GOPATH}/src"
+    fi
+  else
+    if [ -z "$test_covermode" ]; then
+      test_covermode="count"
+    fi
+  fi
+
+  if [ "$test_verbose" = "true" ] || [ "${CI:-}" != "true" ]; then
+    use_verbose="true"
+  else
+    use_verbose="false"
+  fi
+
+  if [ "$use_verbose" = "true" ]; then
+    test_args="-v ${test_args}"
+  fi
+
+  if [ -n "$test_count" ]; then
+    test_args="-count=${test_count} ${test_args}"
+  fi
+
+  test_args="-covermode=${test_covermode} ${test_args}"
+  test_cgo_enabled="0"
+  if [ "$test_race" = "true" ]; then
+    test_cgo_enabled="1"
+  fi
+
+  if [ "$test_runner" = "gotestsum" ]; then
+    CGO_ENABLED="${test_cgo_enabled}" gotestsum -- ${test_args}
+  else
+    CGO_ENABLED="${test_cgo_enabled}" go test ${test_args}
+  fi
+'''
+
+[tasks."go:test:gotestsum"]
+description = "Run Go tests with coverage via gotestsum"
+run = "mise run go:test --runner gotestsum"
+
+[tasks."go:test:clean"]
+description = "Remove test artifacts"
+run = "rm -f *.out coverage.* *.coverprofile profile.cov"
+
+[tasks."go:coverage"]
+description = "Open HTML coverage report"
+usage = 'arg "[profile]" help="Coverage profile file" default="unit.coverprofile"'
+run = "go tool cover -html=${usage_profile?}"
+
+[tasks."go:coverage:total"]
+description = "Print total coverage percentage"
+usage = 'arg "[profile]" help="Coverage profile file" default="unit.coverprofile"'
+run = "go tool cover -func ${usage_profile?} | grep total | awk '{ printf \"total coverage: %s of statements\\n\", $3 }'"
+
+[tasks."go:compile"]
+description = "Compile packages as a build check"
+run = "CGO_ENABLED=0 go build -o /dev/null ./..."
+
+[tasks."go:install"]
+description = "Compile and install the main package"
+run = "go install ."
+
+[tasks."go:install:clean"]
+description = "Remove install artifacts"
+run = '''
+  set -e
+  import_path="$(go list .)"
+  binary_name="${import_path##*/}"
+  bindir="$(go env GOBIN)"
+  if [ -z "$bindir" ]; then
+    bindir="$(go env GOPATH)/bin"
+  fi
+  goexe="$(go env GOEXE)"
+  rm -f "${bindir}/${binary_name}${goexe}"
+'''

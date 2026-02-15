@@ -1,0 +1,59 @@
+[tasks.package]
+description = "Build release artifacts locally with goreleaser"
+run = '''
+  set -e
+  release_config="${GORELEASER_CONFIG:-}"
+  if [ -z "$release_config" ]; then
+    if [ -f ".goreleaser.yaml" ]; then
+      release_config=".goreleaser.yaml"
+    elif [ -f ".goreleaser.yml" ]; then
+      release_config=".goreleaser.yml"
+    fi
+  fi
+  if [ -n "$release_config" ]; then
+    goreleaser release --config="$release_config" --snapshot --skip=publish --clean
+  else
+    goreleaser release --snapshot --skip=publish --clean
+  fi
+'''
+
+[tasks.release]
+description = "Create a full goreleaser release"
+run = '''
+  set -e
+  release_config="${GORELEASER_CONFIG:-}"
+  if [ -z "$release_config" ]; then
+    if [ -f ".goreleaser.yaml" ]; then
+      release_config=".goreleaser.yaml"
+    elif [ -f ".goreleaser.yml" ]; then
+      release_config=".goreleaser.yml"
+    fi
+  fi
+  if [ -n "$release_config" ]; then
+    goreleaser release --config="$release_config" --clean
+  else
+    goreleaser release --clean
+  fi
+'''
+
+[tasks.nightly]
+description = "Run a nightly release using GORELEASER_CURRENT_TAG"
+run = """
+  set -e
+  if [ -z "${GORELEASER_CURRENT_TAG:-}" ]; then
+    echo "missing nightly build tag"
+    exit 1
+  fi
+
+  git tag "$GORELEASER_CURRENT_TAG"
+  trap 'git tag -d "$GORELEASER_CURRENT_TAG" >/dev/null 2>&1 || true' EXIT
+  mise run release
+"""
+
+[tasks.build]
+description = "Run lint, test, and package checks"
+depends = ["lint", "test", "package"]
+
+[tasks."build:clean"]
+description = "Remove build artifacts for this project"
+run = "rm -rf ./dist/"

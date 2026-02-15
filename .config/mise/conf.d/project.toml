@@ -1,0 +1,27 @@
+[tasks.tidy]
+description = "Run project tidy workflow"
+depends = ["go:mod:tidy"]
+
+[tasks.fmt]
+description = "Format project source code"
+depends = ["go:fmt"]
+
+[tasks.lint]
+description = "Run linters"
+depends = ["go:lint", "go:mod:lint"]
+
+[tasks.test]
+description = "Run tests"
+depends = ["go:test:gotestsum"]
+
+[tasks.compile]
+description = "Compile packages as a build check"
+depends = ["go:compile"]
+
+[tasks.install]
+description = "Compile and install the main package"
+depends = ["go:install"]
+
+[tasks."pre-commit"]
+description = "Run formatting, linting, and tests"
+depends = ["tidy", "fmt", "lint", "test"]

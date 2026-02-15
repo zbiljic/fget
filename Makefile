@@ -3,37 +3,33 @@ PROJECT_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 # Using directory as project name.
 PROJECT_NAME := $(shell basename $(PROJECT_ROOT))
-PROJECT_MODULE := $(shell go list -m)
 
-default: help
+# ═══════════════════════════════════════════════════════════════════════════
+# This project uses mise (https://mise.jdx.dev) for project management.
+#
+# To get started:
+#   1. Run 'make' to see available mise tasks
+#   2. If mise is not installed, you'll get installation instructions
+#   3. Run 'mise install' to install project dependencies
+#   4. Run 'mise run <task>' to execute any task
+# ═══════════════════════════════════════════════════════════════════════════
 
-ifeq ($(CI),true)
-$(info Running in a CI environment, verbose mode is disabled)
-else
-VERBOSE="true"
-endif
+default: welcome
 
-# include per-user customization after all variables are defined
--include Makefile.local
-
-HELP_FORMAT="    \033[36m%-20s\033[0m %s\n"
-.PHONY: help
-help: ## Display this usage information
-	@echo "Valid targets:"
-	@{ \
-		echo $(MAKEFILE_LIST) \
-			| xargs grep -E '^[^ \$$]+:.*?## .*$$' -h \
-		; \
-		echo $(MAKEFILE_LIST) \
-			| xargs cat 2> /dev/null \
-			| sed -e 's/$\(eval/$\(info/' \
-			| make -f- 2> /dev/null \
-			| grep -E '^[^ ]+:.*?## .*$$' -h \
-		; \
-	} \
-		| sort \
-		| awk 'BEGIN {FS = ":.*?## "}; \
-			{printf $(HELP_FORMAT), $$1, $$2}'
+.PHONY: welcome
+welcome: tools ## Get started - shows available mise tasks
+	@echo ""
+	@echo "╔═══════════════════════════════════════════════════════════"
+	@echo "║ '$(PROJECT_NAME)'"
+	@echo "║ Using mise for project management"
+	@echo "╚═══════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Available mise tasks:"
+	@echo ""
+	@mise tasks
+	@echo ""
+	@echo "-> Run tasks with:  mise run <task>"
+	@echo "-> Install deps:    mise install"
 	@echo ""
 
 .PHONY: tools
@@ -50,112 +46,6 @@ tools:
 bootstrap: tools # Install all dependencies
 	@mise install
 
-GO_VERSION := $(shell go mod edit -json | sed -En 's/"Go": "([^"]*).*/\1/p' | tr -d '[:blank:]')
-
-GO_MOD_TIDY_CMD   := go mod tidy -compat=$(GO_VERSION)
-GO_MOD_TIDY_E_CMD := go mod tidy -e -compat=$(GO_VERSION)
-
-.PHONY: go-mod-tidy
-go-mod-tidy:
-	@cd $(PROJECT_ROOT) && $(GO_MOD_TIDY_E_CMD) && $(GO_MOD_TIDY_CMD)
-
-.PHONY: tidy
-tidy: go-mod-tidy
-
-.PHONY: gofmt
-gofmt: tools
-gofmt: ## Format Go code
-	@mise x -- gofumpt -extra -l -w .
-
-.PHONY: lint
-lint: tools
-lint: ## Lint the source code
-	@echo "==> Linting source code..."
-	@mise x -- golangci-lint run --config=.golangci.yml --fix
-
-	@echo "==> Checking Go mod..."
-	@$(MAKE) tidy
-	@if (git status --porcelain | grep -Eq "go\.(mod|sum)"); then \
-		echo go.mod or go.sum needs updating; \
-		git --no-pager diff go.mod; \
-		git --no-pager diff go.sum; \
-		exit 1; fi
-
-.PHONY: gogenerate
-gogenerate: ## Generate code from Go code
-	@go generate $(if $(VERBOSE),-x) ./...
-
-.PHONY: test
-test: tools
-test: ## Run the test suite and/or any other tests
-	CGO_ENABLED=0 $(if $(ENABLE_RACE),GORACE="strip_path_prefix=$(GOPATH)/src") \
-		mise x -- gotestsum \
-		-- \
-		$(if $(ENABLE_RACE),-race) $(if $(VERBOSE),-v) \
-		-cover \
-		-coverprofile=unit.coverprofile \
-		$(if $(ENABLE_RACE),-covermode=atomic,-covermode=count) \
-		-timeout=15m \
-		./...
-
-.PHONY: coverage
-coverage: ## Open a web browser displaying coverage
-	go tool cover -html=unit.coverprofile
-
-.PHONY: coverage-total
-coverage-total: ## Print total coverage percentage
-	@go tool cover -func unit.coverprofile | grep total | awk '{ printf "total coverage: %s of statements\n", $$3 }'
-
-.PHONY: compile
-compile: # Compiles the packages but discards the resulting object, serving only as a check that the packages can be built
-	CGO_ENABLED=0 go build -o /dev/null ./...
-
-.PHONY: install
-install: install-$(PROJECT_NAME)
-install: ## Compile and install the main packages
-
-.PHONY: install-$(PROJECT_NAME)
-install-$(PROJECT_NAME):
-	@if [ -x "$$(command -v $(PROJECT_NAME))" ]; then \
-		echo "$(PROJECT_NAME) is already installed, do you want to re-install it? [y/N] " && read ans; \
-			if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]  ; then \
-				go install .; \
-			else \
-				echo "aborting install"; \
-			exit -1; \
-		fi; \
-	else \
-		go install .; \
-	fi;
-
-.PHONY: package
-package: tools
-	mise x -- goreleaser release --config=.goreleaser.yaml --snapshot --skip=publish --clean
-
-.PHONY: release
-release: tools
-	mise x -- goreleaser release --config=.goreleaser.yaml --clean
-
-.PHONY: nightly
-nightly: tools
-	@if [ ! -z $${GORELEASER_CURRENT_TAG+x} ]; then \
-		git tag $(GORELEASER_CURRENT_TAG); \
-		$(MAKE) release; \
-		git tag -d $(GORELEASER_CURRENT_TAG); \
-	else \
-		echo "missing nightly build tag"; \
-		exit -1; \
-	fi;
-
-.PHONY: build
-build: lint test package
-
-.PHONY: pre-commit
-pre-commit: gofmt lint test
-
-.PHONY: clean
-clean: ## Remove build artifacts
-	@echo "==> Removing build artifacts..."
-	@rm -f $(if $(VERBOSE),-v) *.out coverage.* *.coverprofile profile.cov
-	@rm -f $(if $(VERBOSE),-v) "$(GOPATH)/bin/$(PROJECT_NAME)"
-	@rm -rf $(if $(VERBOSE),-v) "$(PROJECT_ROOT)/dist/"
+.PHONY: tasks
+tasks: tools ## List all available mise tasks
+	@mise tasks
