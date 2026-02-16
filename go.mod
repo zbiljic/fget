@@ -19,7 +19,7 @@ require (
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/thediveo/enumflag/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
-	github.com/zbiljic/gitexec v0.0.0-20260209015828-86c75446d7cb
+	github.com/zbiljic/gitexec v0.0.0-20260216083500-1fd098e87183
 	golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a
 )
 
