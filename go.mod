@@ -1,6 +1,6 @@
 module github.com/zbiljic/fget
 
-go 1.24.0
+go 1.25.0
 
 require (
 	dario.cat/mergo v1.0.2
@@ -20,7 +20,7 @@ require (
 	github.com/thediveo/enumflag/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
 	github.com/zbiljic/gitexec v0.0.0-20260209015828-86c75446d7cb
-	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
+	golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a
 )
 
 require (
