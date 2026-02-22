@@ -16,15 +16,25 @@ func GitDirectoriesTree(paths ...string) (art.Tree, error) {
 			return nil
 		}
 
-		dir := filepath.Dir(path)
-		key := art.Key(dir)
+		if !info.IsDir() {
+			return nil
+		}
 
-		if info.IsDir() && strings.EqualFold(".git", info.Name()) {
-			tree.Insert(key, nil)
+		// If a directory itself contains a ".git" directory, treat it as a repository
+		// root and skip traversing into children.
+		gitDirInfo, gitDirErr := os.Stat(filepath.Join(path, ".git"))
+		if gitDirErr == nil && gitDirInfo.IsDir() {
+			tree.Insert(art.Key(path), nil)
 			return filepath.SkipDir
 		}
 
-		if _, ok := tree.Search(key); ok {
+		// Keep direct ".git" directory detection as fallback.
+		if strings.EqualFold(".git", info.Name()) {
+			tree.Insert(art.Key(filepath.Dir(path)), nil)
+			return filepath.SkipDir
+		}
+
+		if _, ok := tree.Search(art.Key(path)); ok {
 			return filepath.SkipDir
 		}
 
