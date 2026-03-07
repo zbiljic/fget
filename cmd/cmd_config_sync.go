@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -32,7 +33,7 @@ func init() {
 	configCmd.AddCommand(configSyncCmd)
 }
 
-func runConfigSync(_ *cobra.Command, args []string) error {
+func runConfigSync(cmd *cobra.Command, args []string) error {
 	runtimeCtx, err := loadConfigRuntimeContext()
 	if err != nil {
 		return err
@@ -68,7 +69,9 @@ func runConfigSync(_ *cobra.Command, args []string) error {
 	err = fconfig.SyncCatalog(
 		catalog,
 		fconfig.SyncOptions{Roots: roots, Prune: configSyncCmdFlags.Prune},
-		findGitRepoPaths,
+		func(roots ...string) ([]string, error) {
+			return findGitRepoPaths(cmd.Context(), roots...)
+		},
 		inspectRepoMetadata,
 		time.Now().UTC(),
 	)
@@ -146,8 +149,8 @@ func resolveSyncRoots(
 	}
 }
 
-func findGitRepoPaths(roots ...string) ([]string, error) {
-	tree, err := fsfind.GitDirectoriesTree(roots...)
+func findGitRepoPaths(ctx context.Context, roots ...string) ([]string, error) {
+	tree, err := fsfind.GitDirectoriesTreeContext(ctx, roots...)
 	if err != nil {
 		return nil, err
 	}

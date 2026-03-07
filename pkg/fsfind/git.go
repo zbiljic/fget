@@ -1,6 +1,7 @@
 package fsfind
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,9 +10,17 @@ import (
 )
 
 func GitDirectoriesTree(paths ...string) (art.Tree, error) {
+	return GitDirectoriesTreeContext(context.Background(), paths...)
+}
+
+func GitDirectoriesTreeContext(ctx context.Context, paths ...string) (art.Tree, error) {
 	tree := art.New()
 
 	dirWalkerFn := func(path string, info os.FileInfo, err error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		if err != nil {
 			return nil
 		}
@@ -42,6 +51,10 @@ func GitDirectoriesTree(paths ...string) (art.Tree, error) {
 	}
 
 	for _, rootPath := range paths {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		err := filepath.Walk(rootPath, dirWalkerFn)
 		if err != nil {
 			return nil, err

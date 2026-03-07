@@ -128,7 +128,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repoPaths, err := fsfind.GitDirectoriesTree(opts.Roots...)
+	repoPaths, err := fsfind.GitDirectoriesTreeContext(cmd.Context(), opts.Roots...)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,8 @@
 package fsfind
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -45,5 +47,22 @@ func TestGitDirectoriesTreeSkipsNestedReposInsideRepoRoot(t *testing.T) {
 
 	if !slices.Equal(got, want) {
 		t.Fatalf("GitDirectoriesTree() = %v, want %v", got, want)
+	}
+}
+
+func TestGitDirectoriesTreeContextStopsWhenCanceled(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "repo", ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(): %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := GitDirectoriesTreeContext(ctx, root)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("GitDirectoriesTreeContext() error = %v, want %v", err, context.Canceled)
 	}
 }

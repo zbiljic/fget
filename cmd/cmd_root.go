@@ -40,12 +40,24 @@ var rootCmd = &cobra.Command{
 // This is called my main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
+		if shouldSilenceExecuteError(err) {
+			return
+		}
+
 		if strings.Contains(err.Error(), "arg(s)") || strings.Contains(err.Error(), "usage") {
 			cmd.Usage() //nolint:errcheck
 		}
 
 		cobra.CheckErr(err)
 	}
+}
+
+func shouldSilenceExecuteError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errors.Is(err, context.Canceled) || err.Error() == context.Canceled.Error()
 }
 
 func runRoot(cmd *cobra.Command, args []string) error {
