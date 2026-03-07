@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/zbiljic/fget/pkg/fconfig"
 )
 
 func TestParseConfigTagModifyArgs(t *testing.T) {
@@ -80,5 +83,133 @@ func TestParseConfigTagModifyArgs_RequiresAtLeastOneTag(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("parseConfigTagModifyArgs() expected error for missing tags")
+	}
+}
+
+func TestResolveConfigTagModifyRequest_ExplicitRepoSelector(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "github.com/acme/api",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/api"},
+				},
+			},
+		},
+	}
+
+	req, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"github.com/acme/api", "alpha"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			t.Fatal("gitRoot should not be called when explicit repo selector is provided")
+			return "", nil
+		},
+		func(context.Context, ...string) ([]string, error) {
+			t.Fatal("findRepos should not be called when explicit repo selector is provided")
+			return nil, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(req.RepoSelectors, []string{"github.com/acme/api"}) {
+		t.Fatalf("resolveConfigTagModifyRequest() selectors = %v, want %v", req.RepoSelectors, []string{"github.com/acme/api"})
+	}
+	if !reflect.DeepEqual(req.Tags, []string{"alpha"}) {
+		t.Fatalf("resolveConfigTagModifyRequest() tags = %v, want %v", req.Tags, []string{"alpha"})
+	}
+	if req.RequiresConfirmation {
+		t.Fatal("resolveConfigTagModifyRequest() RequiresConfirmation = true, want false")
+	}
+}
+
+func TestResolveConfigTagModifyRequest_BulkFromSearchWhenOutsideRepo(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "github.com/acme/api",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/repos/api"},
+				},
+			},
+			{
+				ID: "github.com/acme/web",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/repos/web"},
+				},
+			},
+		},
+	}
+
+	req, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"team-a", "critical"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			return "", errors.New("not in git repo")
+		},
+		func(_ context.Context, roots ...string) ([]string, error) {
+			if !reflect.DeepEqual(roots, []string{"/workspace"}) {
+				t.Fatalf("findRepos() roots = %v, want %v", roots, []string{"/workspace"})
+			}
+			return []string{"/workspace/repos/web", "/workspace/repos/api"}, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %v", err)
+	}
+
+	wantSelectors := []string{"github.com/acme/api", "github.com/acme/web"}
+	if !reflect.DeepEqual(req.RepoSelectors, wantSelectors) {
+		t.Fatalf("resolveConfigTagModifyRequest() selectors = %v, want %v", req.RepoSelectors, wantSelectors)
+	}
+	if !reflect.DeepEqual(req.Tags, []string{"team-a", "critical"}) {
+		t.Fatalf("resolveConfigTagModifyRequest() tags = %v, want %v", req.Tags, []string{"team-a", "critical"})
+	}
+	if !req.RequiresConfirmation {
+		t.Fatal("resolveConfigTagModifyRequest() RequiresConfirmation = false, want true")
+	}
+}
+
+func TestResolveConfigTagModifyRequest_BulkFromSearchNoCatalogMatches(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "github.com/acme/api",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/repos/api"},
+				},
+			},
+		},
+	}
+
+	_, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"team-a"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			return "", errors.New("not in git repo")
+		},
+		func(context.Context, ...string) ([]string, error) {
+			return []string{"/workspace/repos/other"}, nil
+		},
+	)
+	if err == nil {
+		t.Fatal("resolveConfigTagModifyRequest() expected error")
+	}
+	if !strings.Contains(err.Error(), "no catalog repositories found") {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %q, want no catalog repositories found", err)
 	}
 }
