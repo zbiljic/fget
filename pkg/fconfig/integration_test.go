@@ -84,3 +84,92 @@ func TestEndToEnd_LoadMergeSyncTagFlow(t *testing.T) {
 		t.Fatalf("loaded repo locations = %d, want 1", len(loadedCatalog.Repos[0].Locations))
 	}
 }
+
+func TestEndToEnd_LinkProjectionFlow(t *testing.T) {
+	t.Parallel()
+
+	homeDir := t.TempDir()
+	sourceRoot := filepath.Join(homeDir, "dev", "src")
+	projectionRoot := filepath.Join(homeDir, "dev", "wtopic___", "fs___")
+	sourceRepo := filepath.Join(sourceRoot, "github.com", "acme", "api")
+	cwd := filepath.Join(projectionRoot, "nested")
+
+	if err := os.MkdirAll(sourceRepo, 0o755); err != nil {
+		t.Fatalf("MkdirAll(sourceRepo) error = %v", err)
+	}
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatalf("MkdirAll(cwd) error = %v", err)
+	}
+
+	homeConfigPath := filepath.Join(homeDir, "fget.yaml")
+	if err := os.WriteFile(homeConfigPath, []byte("version: \"1\"\nroots:\n  - ~/dev/src\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(homeConfigPath) error = %v", err)
+	}
+
+	projectConfigPath := filepath.Join(projectionRoot, "fget.yaml")
+	projectConfigContent := "" +
+		"version: \"1\"\n" +
+		"link:\n" +
+		"  tags:\n" +
+		"    - fs___\n" +
+		"  layout: repo-id\n" +
+		"  root: .\n" +
+		"  source_root: ~/dev/src\n"
+	if err := os.WriteFile(projectConfigPath, []byte(projectConfigContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(projectConfigPath) error = %v", err)
+	}
+
+	effectiveConfig, err := LoadEffectiveConfig(homeDir, cwd, "")
+	if err != nil {
+		t.Fatalf("LoadEffectiveConfig() error = %v", err)
+	}
+	if effectiveConfig.Link == nil {
+		t.Fatal("effective link config = nil, want non-nil")
+	}
+
+	catalog, err := LoadCatalog(effectiveConfig.Catalog.Path)
+	if err != nil {
+		t.Fatalf("LoadCatalog() error = %v", err)
+	}
+
+	now := time.Now().UTC()
+	find := func(roots ...string) ([]string, error) {
+		return []string{sourceRepo}, nil
+	}
+	inspect := func(path string) (RepoMetadata, error) {
+		return RepoMetadata{
+			ID:        "github.com/acme/api",
+			Path:      path,
+			RemoteURL: "https://github.com/acme/api",
+		}, nil
+	}
+
+	if err := SyncCatalog(catalog, SyncOptions{Roots: effectiveConfig.Roots, Prune: true}, find, inspect, now); err != nil {
+		t.Fatalf("SyncCatalog() error = %v", err)
+	}
+	if err := AddTags(catalog, "github.com/acme/api", []string{"fs___"}); err != nil {
+		t.Fatalf("AddTags() error = %v", err)
+	}
+
+	targets, problems := ResolveLinkTargets(catalog, *effectiveConfig.Link)
+	if len(problems) != 0 {
+		t.Fatalf("ResolveLinkTargets() problems = %v, want none", problems)
+	}
+
+	result, err := SyncLinks(effectiveConfig.Link.Root, targets)
+	if err != nil {
+		t.Fatalf("SyncLinks() error = %v", err)
+	}
+	if result.Created != 1 {
+		t.Fatalf("SyncLinks() created = %d, want 1", result.Created)
+	}
+
+	linkPath := filepath.Join(projectionRoot, "github.com", "acme", "api")
+	linkTarget, err := os.Readlink(linkPath)
+	if err != nil {
+		t.Fatalf("Readlink(linkPath) error = %v", err)
+	}
+	if linkTarget != sourceRepo {
+		t.Fatalf("Readlink(linkPath) = %q, want %q", linkTarget, sourceRepo)
+	}
+}

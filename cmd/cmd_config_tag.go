@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -356,17 +355,5 @@ func loadCatalogForTagCommandWithRuntimeContext(runtimeCtx configRuntimeContext)
 		return nil, "", err
 	}
 
-	if _, err := os.Stat(config.Catalog.Path); err != nil {
-		if os.IsNotExist(err) {
-			return nil, "", fmt.Errorf("catalog does not exist at %s; run `fget config sync` first", config.Catalog.Path)
-		}
-		return nil, "", err
-	}
-
-	catalog, err := fconfig.LoadCatalog(config.Catalog.Path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return catalog, config.Catalog.Path, nil
+	return loadCatalogForEffectiveConfig(config)
 }

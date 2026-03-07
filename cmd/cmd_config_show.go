@@ -24,6 +24,7 @@ type configShowOutput struct {
 	Version string                `json:"version"`
 	Roots   []string              `json:"roots"`
 	Catalog fconfig.CatalogConfig `json:"catalog"`
+	Link    *fconfig.LinkConfig   `json:"link,omitempty"`
 	Sources []string              `json:"sources"`
 }
 
@@ -42,6 +43,7 @@ func runConfigShow(_ *cobra.Command, _ []string) error {
 		Version: config.Version,
 		Roots:   config.Roots,
 		Catalog: config.Catalog,
+		Link:    config.Link,
 		Sources: config.Sources,
 	}
 

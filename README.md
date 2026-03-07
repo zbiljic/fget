@@ -182,9 +182,39 @@ fget config tag add github.com/zbiljic/fget cli golang
 fget config tag remove github.com/zbiljic/fget cli
 fget config tag list
 fget config tag list github.com/zbiljic/fget
+
+# Sync a projection directory from catalog tags
+cd ~/dev/wtopic___/fs___
+fget config link sync
 ```
 
 `config init` creates or updates `fget.yaml`; `config sync` creates or refreshes `catalog.yaml`.
+
+Projection directories can reuse the same `fget.yaml` format:
+
+```yaml
+version: "1"
+
+link:
+  tags:
+    - fs___
+  match: any
+  layout: repo-id
+  root: .
+  source_root: ~/dev/src
+```
+
+With the example above, any catalog repo tagged `fs___` is projected under the current directory using its repo ID as the relative path. For example, `github.com/cli/cli` becomes `./github.com/cli/cli`.
+
+`fget config link sync` is stateless:
+
+- it reads the shared `catalog.yaml`
+- it selects matching repos by tag
+- it creates or updates symlinks under `link.root`
+- it removes stale symlinks under that root
+- it never removes real files or directories, so locally cloned repos can coexist with projected links
+
+If a catalog repo has multiple locations, set `link.source_root` so `fget` can choose the correct clone path.
 
 ## Contributing
 
