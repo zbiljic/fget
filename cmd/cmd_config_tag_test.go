@@ -213,3 +213,30 @@ func TestResolveConfigTagModifyRequest_BulkFromSearchNoCatalogMatches(t *testing
 		t.Fatalf("resolveConfigTagModifyRequest() error = %q, want no catalog repositories found", err)
 	}
 }
+
+func TestConfigTagModifyConfirmText_ListsRepositories(t *testing.T) {
+	t.Parallel()
+
+	req := configTagModifyRequest{
+		RepoSelectors: []string{
+			"github.com/acme/api",
+			"github.com/acme/web",
+		},
+		Tags: []string{"team-a", "critical"},
+	}
+
+	got := configTagModifyConfirmText("add", req)
+
+	if !strings.Contains(got, "add tags [team-a,critical] on 2 discovered repositories:") {
+		t.Fatalf("configTagModifyConfirmText() = %q, want summary header", got)
+	}
+	if !strings.Contains(got, " - github.com/acme/api") {
+		t.Fatalf("configTagModifyConfirmText() = %q, want api repo in list", got)
+	}
+	if !strings.Contains(got, " - github.com/acme/web") {
+		t.Fatalf("configTagModifyConfirmText() = %q, want web repo in list", got)
+	}
+	if !strings.Contains(got, "continue?") {
+		t.Fatalf("configTagModifyConfirmText() = %q, want continue text", got)
+	}
+}

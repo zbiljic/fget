@@ -305,12 +305,7 @@ func confirmConfigTagModify(action string, req configTagModifyRequest) error {
 		return fmt.Errorf("config tag %s requires confirmation; rerun with --yes for non-interactive use", action)
 	}
 
-	confirmMsg := fmt.Sprintf(
-		"%s tags [%s] on %d discovered repositories",
-		action,
-		strings.Join(req.Tags, ","),
-		len(req.RepoSelectors),
-	)
+	confirmMsg := configTagModifyConfirmText(action, req)
 
 	ok, err := pterm.DefaultInteractiveConfirm.
 		WithDefaultValue(false).
@@ -324,6 +319,26 @@ func confirmConfigTagModify(action string, req configTagModifyRequest) error {
 	}
 
 	return nil
+}
+
+func configTagModifyConfirmText(action string, req configTagModifyRequest) string {
+	var b strings.Builder
+
+	fmt.Fprintf(
+		&b,
+		"%s tags [%s] on %d discovered repositories:\n",
+		action,
+		strings.Join(req.Tags, ","),
+		len(req.RepoSelectors),
+	)
+
+	for _, repoSelector := range req.RepoSelectors {
+		fmt.Fprintf(&b, " - %s\n", repoSelector)
+	}
+
+	b.WriteString("continue?")
+
+	return b.String()
 }
 
 func loadCatalogForTagCommand() (*fconfig.Catalog, string, error) {
