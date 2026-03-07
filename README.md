@@ -135,6 +135,43 @@ fget list ~/src
 # github.com/pterm/pterm
 ```
 
+### `config`: Manage merged config, catalog, and tags
+
+`fget` supports a merged configuration model and a machine-managed repository catalog:
+
+- Global base config: `$XDG_CONFIG_HOME/fget/fget.yaml` or `~/.config/fget/fget.yaml`
+- Overlay configs: `fget.yaml` files discovered from your home directory down to your current directory
+- Catalog file: `$XDG_CONFIG_HOME/fget/catalog.yaml` or `~/.config/fget/catalog.yaml`
+
+Example config file:
+
+```yaml
+version: "1"
+roots:
+  - ~/dev
+catalog:
+  path: "~/.config/fget/catalog.yaml"
+```
+
+Common commands:
+
+```sh
+# Show effective merged configuration and resolved catalog path
+fget config show
+
+# Re-scan roots and update catalog (remove stale entries with --prune)
+fget config sync --prune
+
+# Override roots for one sync run
+fget config sync --root ~/dev --root ~/work --prune
+
+# Manage user-defined tags
+fget config tag add github.com/zbiljic/fget cli golang
+fget config tag remove github.com/zbiljic/fget cli
+fget config tag list
+fget config tag list github.com/zbiljic/fget
+```
+
 ## Contributing
 
 Contributions are welcome!

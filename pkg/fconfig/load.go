@@ -11,8 +11,7 @@ import (
 
 type EffectiveConfig struct {
 	Config
-	Sources     []string
-	CatalogPath string
+	Sources []string
 }
 
 func LoadEffectiveConfig(homeDir, cwd, xdgConfigHome string) (*EffectiveConfig, error) {
@@ -58,10 +57,6 @@ func LoadEffectiveConfig(homeDir, cwd, xdgConfigHome string) (*EffectiveConfig, 
 			effective.Catalog.Path = cfg.Catalog.Path
 		}
 
-		if cfg.Tags.Defaults != nil {
-			effective.Tags.Defaults = cfg.Tags.Defaults
-		}
-
 		effective.Sources = append(effective.Sources, file)
 	}
 
@@ -70,9 +65,9 @@ func LoadEffectiveConfig(homeDir, cwd, xdgConfigHome string) (*EffectiveConfig, 
 	}
 
 	if effective.Catalog.Path == "" {
-		effective.CatalogPath = ResolveDefaultCatalogPath(xdgConfigHome, homeDir)
+		effective.Catalog.Path = ResolveDefaultCatalogPath(xdgConfigHome, homeDir)
 	} else {
-		effective.CatalogPath = expandPath(effective.Catalog.Path, homeDir, cwd)
+		effective.Catalog.Path = expandPath(effective.Catalog.Path, homeDir, cwd)
 	}
 
 	return effective, nil

@@ -32,7 +32,7 @@ func TestEndToEnd_LoadMergeSyncTagFlow(t *testing.T) {
 		t.Fatalf("LoadEffectiveConfig() error = %v", err)
 	}
 
-	catalog, err := LoadCatalog(effectiveConfig.CatalogPath)
+	catalog, err := LoadCatalog(effectiveConfig.Catalog.Path)
 	if err != nil {
 		t.Fatalf("LoadCatalog() error = %v", err)
 	}
@@ -60,11 +60,11 @@ func TestEndToEnd_LoadMergeSyncTagFlow(t *testing.T) {
 		t.Fatalf("RemoveTags() error = %v", err)
 	}
 
-	if err := SaveCatalog(effectiveConfig.CatalogPath, catalog); err != nil {
+	if err := SaveCatalog(effectiveConfig.Catalog.Path, catalog); err != nil {
 		t.Fatalf("SaveCatalog() error = %v", err)
 	}
 
-	loadedCatalog, err := LoadCatalog(effectiveConfig.CatalogPath)
+	loadedCatalog, err := LoadCatalog(effectiveConfig.Catalog.Path)
 	if err != nil {
 		t.Fatalf("LoadCatalog() after save error = %v", err)
 	}

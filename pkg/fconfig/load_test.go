@@ -53,8 +53,8 @@ func TestLoadEffectiveConfig_MergesHomeToCwd(t *testing.T) {
 	}
 
 	wantCatalogPath := filepath.Join(homeDir, "custom", "catalog.yaml")
-	if eff.CatalogPath != wantCatalogPath {
-		t.Fatalf("effective catalog path = %q, want %q", eff.CatalogPath, wantCatalogPath)
+	if eff.Catalog.Path != wantCatalogPath {
+		t.Fatalf("effective catalog path = %q, want %q", eff.Catalog.Path, wantCatalogPath)
 	}
 }
 
@@ -79,7 +79,7 @@ func TestLoadEffectiveConfig_DefaultCatalogPath(t *testing.T) {
 	}
 
 	want := ResolveDefaultCatalogPath("", homeDir)
-	if eff.CatalogPath != want {
-		t.Fatalf("effective catalog path = %q, want %q", eff.CatalogPath, want)
+	if eff.Catalog.Path != want {
+		t.Fatalf("effective catalog path = %q, want %q", eff.Catalog.Path, want)
 	}
 }
