@@ -156,6 +156,18 @@ catalog:
 Common commands:
 
 ```sh
+# Create/update global config (~/.config/fget/fget.yaml by default)
+fget config init
+
+# Add specific roots to config (missing roots are merged in and sorted)
+fget config init --root ~/dev --root ~/work
+
+# Write local config in current directory
+fget config init --local
+
+# Write explicit config file (overwrites with minimal config when --force is set)
+fget config init --file ~/tmp/fget.yaml --force
+
 # Show effective merged configuration and resolved catalog path
 fget config show
 
@@ -171,6 +183,8 @@ fget config tag remove github.com/zbiljic/fget cli
 fget config tag list
 fget config tag list github.com/zbiljic/fget
 ```
+
+`config init` creates or updates `fget.yaml`; `config sync` creates or refreshes `catalog.yaml`.
 
 ## Contributing
 
