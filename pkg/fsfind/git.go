@@ -2,12 +2,40 @@ package fsfind
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	art "github.com/plar/go-adaptive-radix-tree/v2"
 )
+
+var ErrNotGitRepository = errors.New("not a git repository")
+
+func GitRootPath(path string) (string, error) {
+	current, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(current, ".git")); err == nil {
+			return current, nil
+		} else if !os.IsNotExist(err) {
+			return "", err
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+
+		current = parent
+	}
+
+	return "", fmt.Errorf("%w: %s", ErrNotGitRepository, path)
+}
 
 func GitDirectoriesTree(paths ...string) (art.Tree, error) {
 	return GitDirectoriesTreeContext(context.Background(), paths...)

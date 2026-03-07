@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/zbiljic/fget/pkg/fconfig"
+	"github.com/zbiljic/fget/pkg/fsfind"
 )
 
 var configTagCmd = &cobra.Command{
@@ -19,16 +20,16 @@ var configTagCmd = &cobra.Command{
 }
 
 var configTagAddCmd = &cobra.Command{
-	Use:   "add <repo> <tag...>",
+	Use:   "add [repo] <tag...>",
 	Short: "Add one or more tags to a repository",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  runConfigTagAdd,
 }
 
 var configTagRemoveCmd = &cobra.Command{
-	Use:   "remove <repo> <tag...>",
+	Use:   "remove [repo] <tag...>",
 	Short: "Remove one or more tags from a repository",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  runConfigTagRemove,
 }
 
@@ -39,6 +40,8 @@ var configTagListCmd = &cobra.Command{
 	RunE:  runConfigTagList,
 }
 
+type configTagGitRootFn func(path string) (string, error)
+
 func init() {
 	configCmd.AddCommand(configTagCmd)
 	configTagCmd.AddCommand(configTagAddCmd)
@@ -47,12 +50,17 @@ func init() {
 }
 
 func runConfigTagAdd(_ *cobra.Command, args []string) error {
-	repoSelector, tags, err := parseConfigTagModifyArgs(args)
+	runtimeCtx, err := loadConfigRuntimeContext()
 	if err != nil {
 		return err
 	}
 
-	catalog, catalogPath, err := loadCatalogForTagCommand()
+	repoSelector, tags, err := parseConfigTagModifyArgs(args, runtimeCtx.Cwd, fsfind.GitRootPath)
+	if err != nil {
+		return err
+	}
+
+	catalog, catalogPath, err := loadCatalogForTagCommandWithRuntimeContext(runtimeCtx)
 	if err != nil {
 		return err
 	}
@@ -70,12 +78,17 @@ func runConfigTagAdd(_ *cobra.Command, args []string) error {
 }
 
 func runConfigTagRemove(_ *cobra.Command, args []string) error {
-	repoSelector, tags, err := parseConfigTagModifyArgs(args)
+	runtimeCtx, err := loadConfigRuntimeContext()
 	if err != nil {
 		return err
 	}
 
-	catalog, catalogPath, err := loadCatalogForTagCommand()
+	repoSelector, tags, err := parseConfigTagModifyArgs(args, runtimeCtx.Cwd, fsfind.GitRootPath)
+	if err != nil {
+		return err
+	}
+
+	catalog, catalogPath, err := loadCatalogForTagCommandWithRuntimeContext(runtimeCtx)
 	if err != nil {
 		return err
 	}
@@ -126,9 +139,21 @@ func runConfigTagList(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-func parseConfigTagModifyArgs(args []string) (string, []string, error) {
-	if len(args) < 2 {
+func parseConfigTagModifyArgs(args []string, cwd string, gitRoot configTagGitRootFn) (string, []string, error) {
+	if len(args) == 0 {
 		return "", nil, errors.New("requires a repository selector and at least one tag")
+	}
+
+	if len(args) == 1 {
+		repoRoot, err := gitRoot(cwd)
+		if err != nil {
+			return "", nil, fmt.Errorf(
+				"requires a repository selector and at least one tag, or run this command from a Git repository root: %w",
+				err,
+			)
+		}
+
+		return repoRoot, args, nil
 	}
 
 	return args[0], args[1:], nil
@@ -140,6 +165,10 @@ func loadCatalogForTagCommand() (*fconfig.Catalog, string, error) {
 		return nil, "", err
 	}
 
+	return loadCatalogForTagCommandWithRuntimeContext(runtimeCtx)
+}
+
+func loadCatalogForTagCommandWithRuntimeContext(runtimeCtx configRuntimeContext) (*fconfig.Catalog, string, error) {
 	config, err := fconfig.LoadEffectiveConfig(runtimeCtx.HomeDir, runtimeCtx.Cwd, runtimeCtx.XDGConfigHome)
 	if err != nil {
 		return nil, "", err

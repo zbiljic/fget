@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -64,5 +65,74 @@ func TestGitDirectoriesTreeContextStopsWhenCanceled(t *testing.T) {
 	_, err := GitDirectoriesTreeContext(ctx, root)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("GitDirectoriesTreeContext() error = %v, want %v", err, context.Canceled)
+	}
+}
+
+func TestGitRootPath_FindsRepoRootFromNestedPath(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	repoRoot := filepath.Join(root, "repo")
+	nested := filepath.Join(repoRoot, "a", "b")
+
+	if err := os.MkdirAll(filepath.Join(repoRoot, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.git) error = %v", err)
+	}
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("MkdirAll(nested) error = %v", err)
+	}
+
+	got, err := GitRootPath(nested)
+	if err != nil {
+		t.Fatalf("GitRootPath() error = %v", err)
+	}
+
+	want := filepath.Clean(repoRoot)
+	if got != want {
+		t.Fatalf("GitRootPath() = %q, want %q", got, want)
+	}
+}
+
+func TestGitRootPath_FindsRepoRootWhenDotGitIsFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	repoRoot := filepath.Join(root, "repo")
+	nested := filepath.Join(repoRoot, "nested")
+
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("MkdirAll(nested) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoRoot, ".git"), []byte("gitdir: /tmp/worktrees/repo"), 0o644); err != nil {
+		t.Fatalf("WriteFile(.git) error = %v", err)
+	}
+
+	got, err := GitRootPath(nested)
+	if err != nil {
+		t.Fatalf("GitRootPath() error = %v", err)
+	}
+
+	want := filepath.Clean(repoRoot)
+	if got != want {
+		t.Fatalf("GitRootPath() = %q, want %q", got, want)
+	}
+}
+
+func TestGitRootPath_ReturnsErrorWhenPathIsNotInsideRepo(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	nested := filepath.Join(root, "outside")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("MkdirAll(nested) error = %v", err)
+	}
+
+	_, err := GitRootPath(nested)
+	if err == nil {
+		t.Fatal("GitRootPath() expected error")
+	}
+
+	if !strings.Contains(err.Error(), "git repository") {
+		t.Fatalf("GitRootPath() error = %q, want git repository message", err)
 	}
 }
