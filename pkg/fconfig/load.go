@@ -11,7 +11,8 @@ import (
 
 type EffectiveConfig struct {
 	Config
-	Sources []string
+	Sources    []string
+	LinkSource string
 }
 
 func LoadEffectiveConfig(homeDir, cwd, xdgConfigHome string) (*EffectiveConfig, error) {
@@ -57,6 +58,11 @@ func LoadEffectiveConfig(homeDir, cwd, xdgConfigHome string) (*EffectiveConfig, 
 			effective.Catalog.Path = cfg.Catalog.Path
 		}
 
+		if cfg.Link != nil {
+			effective.Link = resolveLinkConfig(cfg.Link, homeDir, filepath.Dir(file))
+			effective.LinkSource = file
+		}
+
 		effective.Sources = append(effective.Sources, file)
 	}
 
@@ -73,7 +79,39 @@ func LoadEffectiveConfig(homeDir, cwd, xdgConfigHome string) (*EffectiveConfig, 
 	return effective, nil
 }
 
+func resolveLinkConfig(cfg *LinkConfig, homeDir, baseDir string) *LinkConfig {
+	if cfg == nil {
+		return nil
+	}
+
+	resolved := *cfg
+	if resolved.Match == "" {
+		resolved.Match = "any"
+	}
+	if resolved.Layout == "" {
+		resolved.Layout = "repo-id"
+	}
+	if resolved.Root == "" {
+		resolved.Root = "."
+	}
+
+	resolved.Root = expandPathFromBase(resolved.Root, homeDir, baseDir)
+	if resolved.SourceRoot != "" {
+		resolved.SourceRoot = expandPathFromBase(resolved.SourceRoot, homeDir, baseDir)
+	}
+
+	if resolved.Tags == nil {
+		resolved.Tags = []string{}
+	}
+
+	return &resolved
+}
+
 func expandPath(path, homeDir, cwd string) string {
+	return expandPathFromBase(path, homeDir, cwd)
+}
+
+func expandPathFromBase(path, homeDir, baseDir string) string {
 	switch {
 	case path == "~":
 		return homeDir
@@ -82,7 +120,7 @@ func expandPath(path, homeDir, cwd string) string {
 	case filepath.IsAbs(path):
 		return path
 	default:
-		return filepath.Join(cwd, path)
+		return filepath.Join(baseDir, path)
 	}
 }
 
