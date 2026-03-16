@@ -19,7 +19,7 @@ require (
 	github.com/tevino/abool/v2 v2.1.0
 	github.com/thediveo/enumflag/v2 v2.1.0
 	github.com/whilp/git-urls v1.0.0
-	github.com/zbiljic/gitexec v0.0.0-20260223020211-85d6ec36066d
+	github.com/zbiljic/gitexec v0.0.0-20260309092129-6dac20cd4be3
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -52,7 +52,7 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
