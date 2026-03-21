@@ -183,6 +183,9 @@ fget config tag remove github.com/zbiljic/fget cli
 fget config tag list
 fget config tag list github.com/zbiljic/fget
 
+# Create/update local link projection config in the current directory
+fget config link init fs___ --source-root ~/dev/src
+
 # Sync a projection directory from catalog tags
 cd ~/dev/wtopic___/fs___
 fget config link sync
@@ -190,7 +193,8 @@ fget config link sync
 
 `config init` creates or updates `fget.yaml`; `config sync` creates or refreshes `catalog.yaml`.
 
-Projection directories can reuse the same `fget.yaml` format:
+Projection directories can reuse the same `fget.yaml` format, or you can generate/update the
+`link:` block with `fget config link init <tag...>`:
 
 ```yaml
 version: "1"
