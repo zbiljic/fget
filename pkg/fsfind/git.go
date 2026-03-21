@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/charlievieth/fastwalk"
 	art "github.com/plar/go-adaptive-radix-tree/v2"
 )
 
@@ -43,53 +46,67 @@ func GitDirectoriesTree(paths ...string) (art.Tree, error) {
 
 func GitDirectoriesTreeContext(ctx context.Context, paths ...string) (art.Tree, error) {
 	tree := art.New()
-
-	dirWalkerFn := func(path string, info os.FileInfo, err error) error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		if err != nil {
-			return nil
-		}
-
-		if !info.IsDir() {
-			return nil
-		}
-
-		// If a directory itself contains a ".git" directory, treat it as a repository
-		// root and skip traversing into children.
-		gitDirInfo, gitDirErr := os.Stat(filepath.Join(path, ".git"))
-		if gitDirErr == nil && gitDirInfo.IsDir() {
-			tree.Insert(art.Key(path), nil)
-			return filepath.SkipDir
-		}
-
-		// Keep direct ".git" directory detection as fallback.
-		if strings.EqualFold(".git", info.Name()) {
-			tree.Insert(art.Key(filepath.Dir(path)), nil)
-			return filepath.SkipDir
-		}
-
-		if _, ok := tree.Search(art.Key(path)); ok {
-			return filepath.SkipDir
-		}
-
-		return nil
-	}
+	var mu sync.Mutex
 
 	for _, rootPath := range paths {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		err := filepath.Walk(rootPath, dirWalkerFn)
-		if err != nil {
+		if err := gitDirectoriesUnderRoot(ctx, tree, &mu, rootPath); err != nil {
 			return nil, err
 		}
 	}
 
 	return tree, nil
+}
+
+func gitDirectoriesUnderRoot(ctx context.Context, tree art.Tree, mu *sync.Mutex, rootPath string) error {
+	conf := fastwalk.DefaultConfig.Copy()
+
+	return fastwalk.Walk(conf, rootPath, func(path string, entry fs.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if walkErr != nil {
+			return nil
+		}
+
+		if entry == nil || !entry.IsDir() {
+			return nil
+		}
+
+		isRepoRoot, err := pathContainsGitRepoMarker(path)
+		if err != nil {
+			return nil
+		}
+		if !isRepoRoot {
+			return nil
+		}
+
+		mu.Lock()
+		tree.Insert(art.Key(path), nil)
+		mu.Unlock()
+
+		return filepath.SkipDir
+	})
+}
+
+func directoryContainsGitRepoMarker(entries []os.DirEntry) bool {
+	for _, entry := range entries {
+		if strings.EqualFold(entry.Name(), ".git") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func pathContainsGitRepoMarker(path string) (bool, error) {
+	if _, err := os.Lstat(filepath.Join(path, ".git")); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
 }
 
 func GitObjectsDirs(gitRootPath string) ([]string, error) {

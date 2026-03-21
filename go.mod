@@ -6,6 +6,7 @@ require (
 	dario.cat/mergo v1.0.2
 	github.com/alitto/pond/v2 v2.7.0
 	github.com/cenkalti/backoff/v5 v5.0.3
+	github.com/charlievieth/fastwalk v1.0.14
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
 	github.com/go-git/go-billy/v5 v5.8.0

@@ -51,6 +51,69 @@ func TestGitDirectoriesTreeSkipsNestedReposInsideRepoRoot(t *testing.T) {
 	}
 }
 
+func TestGitDirectoriesTreeDetectsRepoWhenDotGitIsFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	repoRoot := filepath.Join(root, "github.com", "example", "worktree")
+
+	if err := os.MkdirAll(repoRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", repoRoot, err)
+	}
+	if err := os.WriteFile(filepath.Join(repoRoot, ".git"), []byte("gitdir: /tmp/worktree"), 0o644); err != nil {
+		t.Fatalf("WriteFile(.git): %v", err)
+	}
+
+	tree, err := GitDirectoriesTree(root)
+	if err != nil {
+		t.Fatalf("GitDirectoriesTree() error = %v", err)
+	}
+
+	if _, ok := tree.Search([]byte(repoRoot)); !ok {
+		t.Fatalf("GitDirectoriesTree() did not include %q", repoRoot)
+	}
+}
+
+func TestDirectoryContainsGitRepoMarker(t *testing.T) {
+	t.Parallel()
+
+	t.Run("dot git directory", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+			t.Fatalf("MkdirAll(.git) error = %v", err)
+		}
+
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			t.Fatalf("ReadDir() error = %v", err)
+		}
+
+		if !directoryContainsGitRepoMarker(entries) {
+			t.Fatal("directoryContainsGitRepoMarker() = false, want true")
+		}
+	})
+
+	t.Run("dot git file", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, ".git"), []byte("gitdir: /tmp/worktree"), 0o644); err != nil {
+			t.Fatalf("WriteFile(.git) error = %v", err)
+		}
+
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			t.Fatalf("ReadDir() error = %v", err)
+		}
+
+		if !directoryContainsGitRepoMarker(entries) {
+			t.Fatal("directoryContainsGitRepoMarker() = false, want true")
+		}
+	})
+}
+
 func TestGitDirectoriesTreeContextStopsWhenCanceled(t *testing.T) {
 	t.Parallel()
 
