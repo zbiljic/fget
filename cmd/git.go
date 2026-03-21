@@ -94,7 +94,7 @@ func gitRemoteURLProjectID(repoURL string) (string, error) {
 		return "", err
 	}
 
-	id := filepath.Join(remoteURL.Host, remoteURL.Path)
+	id := filepath.Join(remoteURL.Host, strings.TrimSuffix(remoteURL.Path, ".git"))
 
 	return id, nil
 }
