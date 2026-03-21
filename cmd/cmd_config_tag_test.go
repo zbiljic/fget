@@ -113,6 +113,10 @@ func TestResolveConfigTagModifyRequest_ExplicitRepoSelector(t *testing.T) {
 			t.Fatal("findRepos should not be called when explicit repo selector is provided")
 			return nil, nil
 		},
+		func(string) (fconfig.RepoMetadata, error) {
+			t.Fatal("inspectRepo should not be called when explicit repo selector is provided")
+			return fconfig.RepoMetadata{}, nil
+		},
 	)
 	if err != nil {
 		t.Fatalf("resolveConfigTagModifyRequest() error = %v", err)
@@ -163,6 +167,10 @@ func TestResolveConfigTagModifyRequest_BulkFromSearchWhenOutsideRepo(t *testing.
 			}
 			return []string{"/workspace/repos/web", "/workspace/repos/api"}, nil
 		},
+		func(string) (fconfig.RepoMetadata, error) {
+			t.Fatal("inspectRepo should not be called when discovered path already matches the catalog")
+			return fconfig.RepoMetadata{}, nil
+		},
 	)
 	if err != nil {
 		t.Fatalf("resolveConfigTagModifyRequest() error = %v", err)
@@ -205,12 +213,77 @@ func TestResolveConfigTagModifyRequest_BulkFromSearchNoCatalogMatches(t *testing
 		func(context.Context, ...string) ([]string, error) {
 			return []string{"/workspace/repos/other"}, nil
 		},
+		func(path string) (fconfig.RepoMetadata, error) {
+			if path != "/workspace/repos/other" {
+				t.Fatalf("inspectRepo() path = %q, want %q", path, "/workspace/repos/other")
+			}
+			return fconfig.RepoMetadata{ID: "github.com/acme/other"}, nil
+		},
 	)
 	if err == nil {
 		t.Fatal("resolveConfigTagModifyRequest() expected error")
 	}
 	if !strings.Contains(err.Error(), "no catalog repositories found") {
 		t.Fatalf("resolveConfigTagModifyRequest() error = %q, want no catalog repositories found", err)
+	}
+}
+
+func TestResolveConfigTagModifyRequest_BulkFromSearchMatchesCatalogByRepoID(t *testing.T) {
+	t.Parallel()
+
+	const (
+		repoID       = "example.com/acme/snippet-one"
+		catalogPath  = "/catalog-root/example.com/acme/snippet-one"
+		discoverPath = "/search-root/example.com/acme/snippet-one"
+		tagName      = "shared-tag"
+	)
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: repoID,
+				Locations: []fconfig.RepoLocation{
+					{Path: catalogPath},
+				},
+			},
+		},
+	}
+
+	req, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{tagName},
+		"/search-root/example.com/acme",
+		catalog,
+		func(string) (string, error) {
+			return "", errors.New("not in git repo")
+		},
+		func(_ context.Context, roots ...string) ([]string, error) {
+			if !reflect.DeepEqual(roots, []string{"/search-root/example.com/acme"}) {
+				t.Fatalf("findRepos() roots = %v, want current directory", roots)
+			}
+			return []string{discoverPath}, nil
+		},
+		func(path string) (fconfig.RepoMetadata, error) {
+			if path != discoverPath {
+				t.Fatalf("inspectRepo() path = %q, want %q", path, discoverPath)
+			}
+			return fconfig.RepoMetadata{
+				ID: repoID,
+			}, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(req.RepoSelectors, []string{repoID}) {
+		t.Fatalf("resolveConfigTagModifyRequest() selectors = %v, want %v", req.RepoSelectors, []string{repoID})
+	}
+	if !reflect.DeepEqual(req.Tags, []string{tagName}) {
+		t.Fatalf("resolveConfigTagModifyRequest() tags = %v, want %v", req.Tags, []string{tagName})
+	}
+	if !req.RequiresConfirmation {
+		t.Fatal("resolveConfigTagModifyRequest() RequiresConfirmation = false, want true")
 	}
 }
 

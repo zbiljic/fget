@@ -41,8 +41,9 @@ var configTagListCmd = &cobra.Command{
 }
 
 type (
-	configTagGitRootFn   func(path string) (string, error)
-	configTagFindReposFn func(ctx context.Context, roots ...string) ([]string, error)
+	configTagGitRootFn     func(path string) (string, error)
+	configTagFindReposFn   func(ctx context.Context, roots ...string) ([]string, error)
+	configTagInspectRepoFn func(path string) (fconfig.RepoMetadata, error)
 )
 
 type configTagModifyRequest struct {
@@ -90,6 +91,7 @@ func runConfigTagAdd(cmd *cobra.Command, args []string) error {
 		catalog,
 		fsfind.GitRootPath,
 		findGitRepoPaths,
+		inspectRepoMetadata,
 	)
 	if err != nil {
 		return err
@@ -136,6 +138,7 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 		catalog,
 		fsfind.GitRootPath,
 		findGitRepoPaths,
+		inspectRepoMetadata,
 	)
 	if err != nil {
 		return err
@@ -225,6 +228,7 @@ func resolveConfigTagModifyRequest(
 	catalog *fconfig.Catalog,
 	gitRoot configTagGitRootFn,
 	findRepos configTagFindReposFn,
+	inspectRepo configTagInspectRepoFn,
 ) (configTagModifyRequest, error) {
 	if len(args) == 0 {
 		return configTagModifyRequest{}, errors.New("requires a repository selector and at least one tag")
@@ -246,7 +250,7 @@ func resolveConfigTagModifyRequest(
 		}, nil
 	}
 
-	repoSelectors, err := resolveCatalogRepoSelectorsBySearch(ctx, cwd, catalog, findRepos)
+	repoSelectors, err := resolveCatalogRepoSelectorsBySearch(ctx, cwd, catalog, findRepos, inspectRepo)
 	if err != nil {
 		return configTagModifyRequest{}, err
 	}
@@ -263,6 +267,7 @@ func resolveCatalogRepoSelectorsBySearch(
 	cwd string,
 	catalog *fconfig.Catalog,
 	findRepos configTagFindReposFn,
+	inspectRepo configTagInspectRepoFn,
 ) ([]string, error) {
 	repoPaths, err := findRepos(ctx, cwd)
 	if err != nil {
@@ -276,7 +281,15 @@ func resolveCatalogRepoSelectorsBySearch(
 	for _, repoPath := range repoPaths {
 		index, err := fconfig.ResolveRepoIndex(catalog, repoPath)
 		if err != nil {
-			continue
+			metadata, inspectErr := inspectRepo(repoPath)
+			if inspectErr != nil || metadata.ID == "" {
+				continue
+			}
+
+			index, err = fconfig.ResolveRepoIndex(catalog, metadata.ID)
+			if err != nil {
+				continue
+			}
 		}
 
 		repoID := catalog.Repos[index].ID
