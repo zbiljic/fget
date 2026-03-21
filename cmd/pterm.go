@@ -30,6 +30,19 @@ func init() {
 	}
 }
 
+func isInteractiveWriter(w io.Writer) bool {
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+
+	file, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+
+	return isatty.IsTerminal(file.Fd()) || isatty.IsCygwinTerminal(file.Fd())
+}
+
 var (
 	ptermInfoMessageStyle    = pterm.NewStyle(pterm.ThemeDefault.InfoMessageStyle...)
 	ptermSuccessMessageStyle = pterm.NewStyle(pterm.ThemeDefault.SuccessMessageStyle...)

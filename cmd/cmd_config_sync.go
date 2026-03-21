@@ -6,6 +6,7 @@ import (
 	"time"
 
 	art "github.com/plar/go-adaptive-radix-tree/v2"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/zbiljic/fget/pkg/fconfig"
@@ -20,15 +21,29 @@ var configSyncCmd = &cobra.Command{
 }
 
 type configSyncOptions struct {
-	Roots []string
-	Prune bool
+	Roots   []string
+	Prune   bool
+	Silent  bool
+	Workers uint16
+}
+
+type syncRepoMetadata struct {
+	ID        string
+	RemoteURL string
 }
 
 var configSyncCmdFlags = configSyncOptions{}
 
+const (
+	configSyncProgressUpdateInterval = 250 * time.Millisecond
+	configSyncDefaultMaxWorkers      = 32
+)
+
 func init() {
 	configSyncCmd.Flags().StringArrayVar(&configSyncCmdFlags.Roots, "root", nil, "Root directories to scan (overrides configured roots)")
 	configSyncCmd.Flags().BoolVar(&configSyncCmdFlags.Prune, "prune", false, "Remove catalog repositories that are not found during sync")
+	configSyncCmd.Flags().BoolVar(&configSyncCmdFlags.Silent, "silent", false, "Suppress live progress output and print only the final summary")
+	configSyncCmd.Flags().Uint16VarP(&configSyncCmdFlags.Workers, "workers", "j", configSyncDefaultMaxWorkers, "Set the maximum number of workers to use")
 
 	configCmd.AddCommand(configSyncCmd)
 }
@@ -66,9 +81,28 @@ func runConfigSync(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	var progressReporter *configSyncProgressReporter
+	if configSyncProgressEnabled(configSyncCmdFlags.Silent, isInteractiveWriter(dynamicOutput)) {
+		spinner, err := pterm.DefaultSpinner.
+			WithWriter(dynamicOutput).
+			WithRemoveWhenDone(true).
+			Start(formatConfigSyncProgressText(0, 0))
+		if err != nil {
+			return err
+		}
+		defer spinner.Stop() //nolint:errcheck
+
+		progressReporter = newConfigSyncProgressReporter(spinner, configSyncProgressUpdateInterval)
+	}
+
 	err = fconfig.SyncCatalog(
 		catalog,
-		fconfig.SyncOptions{Roots: roots, Prune: configSyncCmdFlags.Prune},
+		fconfig.SyncOptions{
+			Roots:    roots,
+			Prune:    configSyncCmdFlags.Prune,
+			Workers:  int(configSyncCmdFlags.Workers),
+			Progress: progressReporter.Update,
+		},
 		func(roots ...string) ([]string, error) {
 			return findGitRepoPaths(cmd.Context(), roots...)
 		},
@@ -86,6 +120,10 @@ func runConfigSync(cmd *cobra.Command, args []string) error {
 	ptermSuccessMessageStyle.Printfln("catalog synced: %d repositories (%s)", len(catalog.Repos), config.Catalog.Path)
 
 	return nil
+}
+
+func configSyncProgressEnabled(silent, interactive bool) bool {
+	return !silent && interactive
 }
 
 func parseConfigSyncArgs(args []string) ([]string, error) {
@@ -165,14 +203,66 @@ func findGitRepoPaths(ctx context.Context, roots ...string) ([]string, error) {
 }
 
 func inspectRepoMetadata(repoPath string) (fconfig.RepoMetadata, error) {
-	repoID, remoteURL, _, err := gitProjectInfo(repoPath)
+	meta, err := inspectSyncRepoMetadata(repoPath)
 	if err != nil {
 		return fconfig.RepoMetadata{}, err
 	}
 
 	return fconfig.RepoMetadata{
-		ID:        repoID,
+		ID:        meta.ID,
 		Path:      repoPath,
-		RemoteURL: remoteURL,
+		RemoteURL: meta.RemoteURL,
 	}, nil
+}
+
+func inspectSyncRepoMetadata(repoPath string) (syncRepoMetadata, error) {
+	remoteURL, err := gitRemoteConfigURL(repoPath)
+	if err != nil {
+		return syncRepoMetadata{}, err
+	}
+
+	repoID, err := gitRemoteURLProjectID(remoteURL.String())
+	if err != nil {
+		return syncRepoMetadata{}, err
+	}
+
+	return syncRepoMetadata{
+		ID:        repoID,
+		RemoteURL: remoteURL.String(),
+	}, nil
+}
+
+type configSyncProgressReporter struct {
+	spinner        *pterm.SpinnerPrinter
+	updateInterval time.Duration
+	lastRenderedAt time.Time
+}
+
+func newConfigSyncProgressReporter(spinner *pterm.SpinnerPrinter, updateInterval time.Duration) *configSyncProgressReporter {
+	return &configSyncProgressReporter{
+		spinner:        spinner,
+		updateInterval: updateInterval,
+	}
+}
+
+func (r *configSyncProgressReporter) Update(processed, total int) {
+	if r == nil || r.spinner == nil {
+		return
+	}
+
+	now := time.Now()
+	if total > 0 && processed != total && !r.lastRenderedAt.IsZero() && now.Sub(r.lastRenderedAt) < r.updateInterval {
+		return
+	}
+
+	r.spinner.UpdateText(formatConfigSyncProgressText(processed, total))
+	r.lastRenderedAt = now
+}
+
+func formatConfigSyncProgressText(processed, total int) string {
+	if total == 0 {
+		return "finding repositories..."
+	}
+
+	return fmt.Sprintf("syncing catalog: %d/%d", processed, total)
 }
