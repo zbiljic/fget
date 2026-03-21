@@ -2,6 +2,8 @@ package fconfig
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -203,11 +205,24 @@ func TestSyncCatalog_FinderReceivesNormalizedRoots(t *testing.T) {
 func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 	t.Parallel()
 
+	baseDir := t.TempDir()
+	scannedRootPath := filepath.Join(baseDir, "src")
+	scannedRepoPath := filepath.Join(scannedRootPath, "kept")
+	unscannedRootPath := filepath.Join(baseDir, "wtopics")
+	unscannedRepoPath := filepath.Join(unscannedRootPath, "kept")
+	removedRepoPath := filepath.Join(scannedRootPath, "remove-me")
+
+	for _, path := range []string{scannedRepoPath, unscannedRepoPath} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("MkdirAll(%q) error = %v", path, err)
+		}
+	}
+
 	catalog := &Catalog{
 		Version: CatalogVersionV1,
 		Roots: []CatalogRoot{
-			{Path: "/repos/src", LastScannedAt: time.Now().UTC().Add(-2 * time.Hour)},
-			{Path: "/repos/wtopics", LastScannedAt: time.Now().UTC().Add(-2 * time.Hour)},
+			{Path: scannedRootPath, LastScannedAt: time.Now().UTC().Add(-2 * time.Hour)},
+			{Path: unscannedRootPath, LastScannedAt: time.Now().UTC().Add(-2 * time.Hour)},
 		},
 		Repos: []RepoEntry{
 			{
@@ -215,8 +230,8 @@ func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 				RemoteURL: "https://github.com/acme/api",
 				Tags:      []string{"service"},
 				Locations: []RepoLocation{
-					{Path: "/repos/src/kept", LastSeenAt: time.Now().UTC().Add(-time.Hour)},
-					{Path: "/repos/wtopics/kept", LastSeenAt: time.Now().UTC().Add(-time.Hour)},
+					{Path: scannedRepoPath, LastSeenAt: time.Now().UTC().Add(-time.Hour)},
+					{Path: unscannedRepoPath, LastSeenAt: time.Now().UTC().Add(-time.Hour)},
 				},
 			},
 			{
@@ -224,7 +239,7 @@ func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 				RemoteURL: "https://github.com/acme/stale",
 				Tags:      []string{"legacy"},
 				Locations: []RepoLocation{
-					{Path: "/repos/src/remove-me", LastSeenAt: time.Now().UTC().Add(-time.Hour)},
+					{Path: removedRepoPath, LastSeenAt: time.Now().UTC().Add(-time.Hour)},
 				},
 			},
 		},
@@ -232,7 +247,7 @@ func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 
 	now := time.Now().UTC()
 	find := func(roots ...string) ([]string, error) {
-		return []string{"/repos/src/kept"}, nil
+		return []string{scannedRepoPath}, nil
 	}
 	inspect := func(path string) (RepoMetadata, error) {
 		return RepoMetadata{
@@ -243,7 +258,7 @@ func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 	}
 
 	err := SyncCatalog(context.Background(), catalog, SyncOptions{
-		Roots: []string{"/repos/src"},
+		Roots: []string{scannedRootPath},
 		Prune: true,
 	}, find, inspect, now)
 	if err != nil {
@@ -258,13 +273,13 @@ func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 	}
 	var scannedRoot CatalogRoot
 	for _, root := range catalog.Roots {
-		if root.Path == "/repos/src" {
+		if root.Path == scannedRootPath {
 			scannedRoot = root
 			break
 		}
 	}
 	if scannedRoot.Path == "" {
-		t.Fatal("expected /repos/src root to exist")
+		t.Fatalf("expected %s root to exist", scannedRootPath)
 	}
 	if scannedRoot.LastScannedAt.IsZero() {
 		t.Fatal("expected /repos/src last_scanned_at to be set")
@@ -279,6 +294,9 @@ func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 	}
 	if len(repo.Locations) != 2 {
 		t.Fatalf("repo location count = %d, want 2", len(repo.Locations))
+	}
+	if repo.Locations[0].Path != scannedRepoPath || repo.Locations[1].Path != unscannedRepoPath {
+		t.Fatalf("repo locations = %#v, want paths %q and %q", repo.Locations, scannedRepoPath, unscannedRepoPath)
 	}
 	if repo.Locations[0].LastSeenAt.IsZero() && repo.Locations[1].LastSeenAt.IsZero() {
 		t.Fatalf("expected at least one updated location timestamp")
@@ -320,5 +338,66 @@ func TestSyncCatalog_NoPruneKeepsMissingLocations(t *testing.T) {
 	}
 	if len(catalog.Repos[0].Locations) != 1 {
 		t.Fatalf("location count = %d, want 1", len(catalog.Repos[0].Locations))
+	}
+}
+
+func TestSyncCatalog_PruneRemovesMissingLocationsOutsideScannedRoots(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	scannedRoot := filepath.Join(baseDir, "scanned")
+	scannedPath := filepath.Join(scannedRoot, "repo")
+	existingUnscannedPath := filepath.Join(baseDir, "unscanned", "repo")
+	missingUnscannedPath := filepath.Join(baseDir, "stale", "repo")
+
+	for _, path := range []string{scannedPath, existingUnscannedPath} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("MkdirAll(%q) error = %v", path, err)
+		}
+	}
+
+	catalog := &Catalog{
+		Version: CatalogVersionV1,
+		Repos: []RepoEntry{
+			{
+				ID:        "github.com/acme/shared-repo",
+				RemoteURL: "https://github.com/acme/shared-repo",
+				Locations: []RepoLocation{
+					{Path: existingUnscannedPath, LastSeenAt: time.Now().UTC().Add(-2 * time.Hour)},
+					{Path: missingUnscannedPath, LastSeenAt: time.Now().UTC().Add(-2 * time.Hour)},
+				},
+			},
+		},
+	}
+
+	find := func(roots ...string) ([]string, error) {
+		return []string{scannedPath}, nil
+	}
+	inspect := func(path string) (RepoMetadata, error) {
+		return RepoMetadata{
+			ID:        "github.com/acme/shared-repo",
+			Path:      path,
+			RemoteURL: "https://github.com/acme/shared-repo",
+		}, nil
+	}
+
+	err := SyncCatalog(context.Background(), catalog, SyncOptions{
+		Roots: []string{scannedRoot},
+		Prune: true,
+	}, find, inspect, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SyncCatalog() error = %v", err)
+	}
+
+	got := catalog.Repos[0].Locations
+	want := []RepoLocation{
+		{Path: scannedPath, LastSeenAt: got[0].LastSeenAt},
+		{Path: existingUnscannedPath, LastSeenAt: got[1].LastSeenAt},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("location count = %d, want %d; locations = %#v", len(got), len(want), got)
+	}
+	if got[0].Path != want[0].Path || got[1].Path != want[1].Path {
+		t.Fatalf("locations = %#v, want paths %q and %q", got, want[0].Path, want[1].Path)
 	}
 }

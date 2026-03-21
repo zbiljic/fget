@@ -103,13 +103,19 @@ func (c *Catalog) PruneLocationsUnderRoots(scannedRoots []string, seen map[strin
 		repoSeen := seen[repo.ID]
 
 		for _, loc := range repo.Locations {
-			if !isPathUnderAnyRoot(loc.Path, scannedRoots) {
+			loc.Path = filepath.Clean(loc.Path)
+
+			if _, ok := repoSeen[loc.Path]; ok {
 				filteredLocations = append(filteredLocations, loc)
 				continue
 			}
 
-			if _, ok := repoSeen[filepath.Clean(loc.Path)]; ok {
+			if !isPathUnderAnyRoot(loc.Path, scannedRoots) {
+				if !pathExists(loc.Path) {
+					continue
+				}
 				filteredLocations = append(filteredLocations, loc)
+				continue
 			}
 		}
 
@@ -122,6 +128,11 @@ func (c *Catalog) PruneLocationsUnderRoots(scannedRoots []string, seen map[strin
 	}
 
 	c.Repos = filteredRepos
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func LoadCatalog(path string) (*Catalog, error) {
