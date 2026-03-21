@@ -1,7 +1,9 @@
 package fconfig
 
 import (
+	"context"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -28,7 +30,7 @@ func TestSyncCatalog_ReportsProgress(t *testing.T) {
 		}, nil
 	}
 
-	err := SyncCatalog(catalog, SyncOptions{
+	err := SyncCatalog(context.Background(), catalog, SyncOptions{
 		Roots: []string{"/repos/src"},
 		Progress: func(processed, total int) {
 			progressEvents = append(progressEvents, struct {
@@ -76,7 +78,7 @@ func TestSyncCatalog_InspectsRepositoriesConcurrently(t *testing.T) {
 	}
 
 	go func() {
-		done <- SyncCatalog(catalog, SyncOptions{
+		done <- SyncCatalog(context.Background(), catalog, SyncOptions{
 			Roots:   []string{"/repos/src"},
 			Workers: 2,
 		}, find, inspect, time.Now().UTC())
@@ -106,6 +108,70 @@ func TestSyncCatalog_InspectsRepositoriesConcurrently(t *testing.T) {
 	}
 }
 
+func TestSyncCatalog_CancelStopsFurtherInspection(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	catalog := &Catalog{Version: CatalogVersionV1}
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondStarted := make(chan struct{}, 1)
+	var inspectCalls atomic.Int64
+
+	find := func(roots ...string) ([]string, error) {
+		return []string{"/repos/src/one", "/repos/src/two", "/repos/src/three"}, nil
+	}
+	inspect := func(path string) (RepoMetadata, error) {
+		call := inspectCalls.Add(1)
+		if call == 1 {
+			close(firstStarted)
+			<-releaseFirst
+		}
+		if call == 2 {
+			secondStarted <- struct{}{}
+		}
+
+		return RepoMetadata{
+			ID:   path,
+			Path: path,
+		}, nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- SyncCatalog(ctx, catalog, SyncOptions{
+			Roots:   []string{"/repos/src"},
+			Workers: 1,
+		}, find, inspect, time.Now().UTC())
+	}()
+
+	select {
+	case <-firstStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first inspect call did not start")
+	}
+
+	cancel()
+	close(releaseFirst)
+
+	select {
+	case err := <-done:
+		if err != context.Canceled {
+			t.Fatalf("SyncCatalog() error = %v, want %v", err, context.Canceled)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("SyncCatalog() did not return after cancellation")
+	}
+
+	select {
+	case <-secondStarted:
+		t.Fatal("second inspect call started after cancellation")
+	default:
+	}
+}
+
 func TestSyncCatalog_FinderReceivesNormalizedRoots(t *testing.T) {
 	t.Parallel()
 
@@ -121,7 +187,7 @@ func TestSyncCatalog_FinderReceivesNormalizedRoots(t *testing.T) {
 		return RepoMetadata{}, nil
 	}
 
-	err := SyncCatalog(catalog, SyncOptions{
+	err := SyncCatalog(context.Background(), catalog, SyncOptions{
 		Roots: []string{"/repos/src", "/repos/src", ".", "/repos/other/../other"},
 	}, find, inspect, time.Now().UTC())
 	if err != nil {
@@ -176,7 +242,7 @@ func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 		}, nil
 	}
 
-	err := SyncCatalog(catalog, SyncOptions{
+	err := SyncCatalog(context.Background(), catalog, SyncOptions{
 		Roots: []string{"/repos/src"},
 		Prune: true,
 	}, find, inspect, now)
@@ -244,7 +310,7 @@ func TestSyncCatalog_NoPruneKeepsMissingLocations(t *testing.T) {
 		return RepoMetadata{}, nil
 	}
 
-	err := SyncCatalog(catalog, SyncOptions{Prune: false}, find, inspect, now)
+	err := SyncCatalog(context.Background(), catalog, SyncOptions{Prune: false}, find, inspect, now)
 	if err != nil {
 		t.Fatalf("SyncCatalog() error = %v", err)
 	}

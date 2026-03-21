@@ -1,6 +1,7 @@
 package fconfig
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -49,7 +50,7 @@ func TestEndToEnd_LoadMergeSyncTagFlow(t *testing.T) {
 		}, nil
 	}
 
-	if err := SyncCatalog(catalog, SyncOptions{Roots: effectiveConfig.Roots, Prune: true}, find, inspect, now); err != nil {
+	if err := SyncCatalog(context.Background(), catalog, SyncOptions{Roots: effectiveConfig.Roots, Prune: true}, find, inspect, now); err != nil {
 		t.Fatalf("SyncCatalog() error = %v", err)
 	}
 
@@ -144,7 +145,7 @@ func TestEndToEnd_LinkProjectionFlow(t *testing.T) {
 		}, nil
 	}
 
-	if err := SyncCatalog(catalog, SyncOptions{Roots: effectiveConfig.Roots, Prune: true}, find, inspect, now); err != nil {
+	if err := SyncCatalog(context.Background(), catalog, SyncOptions{Roots: effectiveConfig.Roots, Prune: true}, find, inspect, now); err != nil {
 		t.Fatalf("SyncCatalog() error = %v", err)
 	}
 	if err := AddTags(catalog, "github.com/acme/api", []string{"fs___"}); err != nil {

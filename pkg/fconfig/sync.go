@@ -1,6 +1,7 @@
 package fconfig
 
 import (
+	"context"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -28,19 +29,34 @@ type (
 )
 
 func SyncCatalog(
+	ctx context.Context,
 	catalog *Catalog,
 	opts SyncOptions,
 	find Finder,
 	inspect Inspector,
 	now time.Time,
 ) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	scannedRoots := normalizePaths(opts.Roots)
 	for _, root := range scannedRoots {
 		catalog.UpsertRoot(root, now)
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	paths, err := find(scannedRoots...)
 	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	progress := synchronizedProgressReporter(opts.Progress)
@@ -52,7 +68,12 @@ func SyncCatalog(
 	}
 
 	seen := make(map[string]map[string]struct{}, len(paths))
-	for _, repo := range inspectRepos(paths, inspect, opts.Workers, progress) {
+	repos, err := inspectRepos(ctx, paths, inspect, opts.Workers, progress)
+	if err != nil {
+		return err
+	}
+
+	for _, repo := range repos {
 		if !repo.OK || repo.Metadata.ID == "" {
 			continue
 		}
@@ -100,25 +121,34 @@ type inspectedRepo struct {
 }
 
 func inspectRepos(
+	ctx context.Context,
 	paths []string,
 	inspect Inspector,
 	workers int,
 	progress func(processed, total int),
-) []inspectedRepo {
+) ([]inspectedRepo, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	results := make([]inspectedRepo, len(paths))
 	if len(paths) == 0 {
-		return results
+		return results, ctx.Err()
 	}
 
 	workerCount := normalizedSyncWorkerCount(workers, len(paths))
 	if workerCount == 1 {
 		for i, path := range paths {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+
 			results[i] = inspectRepoPath(path, inspect)
 
 			reportSyncProgress(progress, i+1, len(paths))
 		}
 
-		return results
+		return results, ctx.Err()
 	}
 
 	var processed atomic.Int64
@@ -135,17 +165,31 @@ func inspectRepos(
 				results[i] = inspectRepoPath(path, inspect)
 
 				reportSyncProgress(progress, int(processed.Add(1)), len(paths))
+
+				if ctx.Err() != nil {
+					return
+				}
 			}
 		}()
 	}
 
 	for i := range paths {
-		jobs <- i
+		select {
+		case <-ctx.Done():
+			close(jobs)
+			wg.Wait()
+			return nil, ctx.Err()
+		case jobs <- i:
+		}
 	}
 	close(jobs)
 	wg.Wait()
 
-	return results
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 func inspectRepoPath(path string, inspect Inspector) inspectedRepo {

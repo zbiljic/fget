@@ -96,6 +96,7 @@ func runConfigSync(cmd *cobra.Command, args []string) error {
 	}
 
 	err = fconfig.SyncCatalog(
+		cmd.Context(),
 		catalog,
 		fconfig.SyncOptions{
 			Roots:    roots,
