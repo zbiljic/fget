@@ -6,6 +6,134 @@ import (
 	"time"
 )
 
+func TestSyncCatalog_ReportsProgress(t *testing.T) {
+	t.Parallel()
+
+	catalog := &Catalog{Version: CatalogVersionV1}
+
+	var progressEvents []struct {
+		Processed int
+		Total     int
+	}
+
+	now := time.Now().UTC()
+	find := func(roots ...string) ([]string, error) {
+		return []string{"/repos/src/one", "/repos/src/two"}, nil
+	}
+	inspect := func(path string) (RepoMetadata, error) {
+		return RepoMetadata{
+			ID:        "github.com/acme/" + path[len(path)-3:],
+			Path:      path,
+			RemoteURL: "https://example.com/" + path[len(path)-3:],
+		}, nil
+	}
+
+	err := SyncCatalog(catalog, SyncOptions{
+		Roots: []string{"/repos/src"},
+		Progress: func(processed, total int) {
+			progressEvents = append(progressEvents, struct {
+				Processed int
+				Total     int
+			}{Processed: processed, Total: total})
+		},
+	}, find, inspect, now)
+	if err != nil {
+		t.Fatalf("SyncCatalog() error = %v", err)
+	}
+
+	wantEvents := []struct {
+		Processed int
+		Total     int
+	}{
+		{Processed: 0, Total: 2},
+		{Processed: 1, Total: 2},
+		{Processed: 2, Total: 2},
+	}
+	if !reflect.DeepEqual(progressEvents, wantEvents) {
+		t.Fatalf("progress events = %v, want %v", progressEvents, wantEvents)
+	}
+}
+
+func TestSyncCatalog_InspectsRepositoriesConcurrently(t *testing.T) {
+	t.Parallel()
+
+	catalog := &Catalog{Version: CatalogVersionV1}
+	inspectStarted := make(chan struct{}, 2)
+	releaseInspect := make(chan struct{})
+	done := make(chan error, 1)
+
+	find := func(roots ...string) ([]string, error) {
+		return []string{"/repos/src/one", "/repos/src/two"}, nil
+	}
+	inspect := func(path string) (RepoMetadata, error) {
+		inspectStarted <- struct{}{}
+		<-releaseInspect
+
+		return RepoMetadata{
+			ID:   path,
+			Path: path,
+		}, nil
+	}
+
+	go func() {
+		done <- SyncCatalog(catalog, SyncOptions{
+			Roots:   []string{"/repos/src"},
+			Workers: 2,
+		}, find, inspect, time.Now().UTC())
+	}()
+
+	select {
+	case <-inspectStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first inspect call did not start")
+	}
+
+	select {
+	case <-inspectStarted:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("second inspect call did not start before the first completed")
+	}
+
+	close(releaseInspect)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("SyncCatalog() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("SyncCatalog() did not return")
+	}
+}
+
+func TestSyncCatalog_FinderReceivesNormalizedRoots(t *testing.T) {
+	t.Parallel()
+
+	catalog := &Catalog{Version: CatalogVersionV1}
+
+	var gotRoots []string
+	find := func(roots ...string) ([]string, error) {
+		gotRoots = append([]string{}, roots...)
+		return []string{}, nil
+	}
+	inspect := func(path string) (RepoMetadata, error) {
+		t.Fatalf("inspect should not be called")
+		return RepoMetadata{}, nil
+	}
+
+	err := SyncCatalog(catalog, SyncOptions{
+		Roots: []string{"/repos/src", "/repos/src", ".", "/repos/other/../other"},
+	}, find, inspect, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SyncCatalog() error = %v", err)
+	}
+
+	wantRoots := []string{"/repos/src", "/repos/other"}
+	if !reflect.DeepEqual(gotRoots, wantRoots) {
+		t.Fatalf("find roots = %v, want %v", gotRoots, wantRoots)
+	}
+}
+
 func TestSyncCatalog_PruneOnlyTouchesScannedRoots(t *testing.T) {
 	t.Parallel()
 
