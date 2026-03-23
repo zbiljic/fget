@@ -45,7 +45,7 @@ func init() {
 	configSyncCmd.Flags().BoolVar(&configSyncCmdFlags.Silent, "silent", false, "Suppress live progress output and print only the final summary")
 	configSyncCmd.Flags().Uint16VarP(&configSyncCmdFlags.Workers, "workers", "j", configSyncDefaultMaxWorkers, "Set the maximum number of workers to use")
 
-	configCmd.AddCommand(configSyncCmd)
+	catalogCmd.AddCommand(configSyncCmd)
 }
 
 func runConfigSync(cmd *cobra.Command, args []string) error {

@@ -172,29 +172,34 @@ fget config init --file ~/tmp/fget.yaml --force
 fget config show
 
 # Re-scan roots and update catalog (remove stale entries with --prune)
-fget config sync --prune
+fget catalog sync --prune
 
 # Override roots for one sync run
-fget config sync --root ~/dev --root ~/work --prune
+fget catalog sync --root ~/dev --root ~/work --prune
 
 # Manage user-defined tags
-fget config tag add github.com/zbiljic/fget cli golang
-fget config tag remove github.com/zbiljic/fget cli
-fget config tag list
-fget config tag list github.com/zbiljic/fget
+fget tag add github.com/zbiljic/fget cli golang
+fget tag remove github.com/zbiljic/fget cli
+fget tag list
+fget tag list github.com/zbiljic/fget
+
+# Inspect the shared repository catalog
+fget catalog list
+fget catalog show github.com/zbiljic/fget
+fget catalog paths github.com/zbiljic/fget github.com/cli/cli
 
 # Create/update local link projection config in the current directory
-fget config link init fs___ --source-root ~/dev/src
+fget link init fs___ --source-root ~/dev/src
 
 # Sync a projection directory from catalog tags
 cd ~/dev/wtopic___/fs___
-fget config link sync
+fget link sync
 ```
 
-`config init` creates or updates `fget.yaml`; `config sync` creates or refreshes `catalog.yaml`.
+`config init` creates or updates `fget.yaml`; `catalog sync` creates or refreshes `catalog.yaml`.
 
 Projection directories can reuse the same `fget.yaml` format, or you can generate/update the
-`link:` block with `fget config link init <tag...>`:
+`link:` block with `fget link init <tag...>`:
 
 ```yaml
 version: "1"
@@ -210,7 +215,7 @@ link:
 
 With the example above, any catalog repo tagged `fs___` is projected under the current directory using its repo ID as the relative path. For example, `github.com/cli/cli` becomes `./github.com/cli/cli`.
 
-`fget config link sync` is stateless:
+`fget link sync` is stateless:
 
 - it reads the shared `catalog.yaml`
 - it selects matching repos by tag

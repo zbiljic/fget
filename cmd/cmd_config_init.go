@@ -72,7 +72,7 @@ func runConfigInit(_ *cobra.Command, _ []string) error {
 
 	ptermSuccessMessageStyle.Printfln("config initialized: %s", targetPath)
 	pterm.Printf("roots: %s\n", strings.Join(config.Roots, ", "))
-	pterm.Println("next: fget config sync")
+	pterm.Println("next: fget catalog sync")
 
 	return nil
 }

@@ -67,7 +67,7 @@ func init() {
 		"Skip confirmation prompt when applying tags to discovered repositories",
 	)
 
-	configCmd.AddCommand(configTagCmd)
+	rootCmd.AddCommand(configTagCmd)
 	configTagCmd.AddCommand(configTagAddCmd)
 	configTagCmd.AddCommand(configTagRemoveCmd)
 	configTagCmd.AddCommand(configTagListCmd)
@@ -79,7 +79,7 @@ func runConfigTagAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	catalog, catalogPath, err := loadCatalogForTagCommandWithRuntimeContext(runtimeCtx)
+	catalog, catalogPath, err := loadCatalogForRuntimeContext(runtimeCtx)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	catalog, catalogPath, err := loadCatalogForTagCommandWithRuntimeContext(runtimeCtx)
+	catalog, catalogPath, err := loadCatalogForRuntimeContext(runtimeCtx)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigTagList(_ *cobra.Command, args []string) error {
-	catalog, _, err := loadCatalogForTagCommand()
+	catalog, _, err := loadCatalogForCurrentRuntimeContext()
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func runConfigTagList(_ *cobra.Command, args []string) error {
 }
 
 func resolveConfigTagListSelector(catalog *fconfig.Catalog, selector string) (string, error) {
-	normalizedSelector, matched, err := resolveExplicitConfigTagRepoSelector(catalog, selector)
+	normalizedSelector, matched, err := resolveExplicitCatalogRepoSelector(catalog, selector)
 	if err != nil {
 		return "", err
 	}
@@ -252,7 +252,7 @@ func resolveConfigTagModifyRequest(
 	}
 
 	if len(args) >= 2 {
-		repoSelector, matched, err := resolveExplicitConfigTagRepoSelector(catalog, args[0])
+		repoSelector, matched, err := resolveExplicitCatalogRepoSelector(catalog, args[0])
 		if err != nil {
 			return configTagModifyRequest{}, err
 		}
@@ -295,9 +295,9 @@ func resolveConfigTagModifyRequest(
 	}, nil
 }
 
-func resolveExplicitConfigTagRepoSelector(catalog *fconfig.Catalog, selector string) (string, bool, error) {
-	if _, err := fconfig.ResolveRepoIndex(catalog, selector); err == nil {
-		return selector, true, nil
+func resolveExplicitCatalogRepoSelector(catalog *fconfig.Catalog, selector string) (string, bool, error) {
+	if index, err := fconfig.ResolveRepoIndex(catalog, selector); err == nil {
+		return catalog.Repos[index].ID, true, nil
 	}
 
 	if !looksLikeRemoteRepoURL(selector) {
@@ -309,11 +309,12 @@ func resolveExplicitConfigTagRepoSelector(catalog *fconfig.Catalog, selector str
 		return "", false, fmt.Errorf("invalid repository URL %q: %w", selector, err)
 	}
 
-	if _, err := fconfig.ResolveRepoIndex(catalog, repoID); err != nil {
+	index, err := fconfig.ResolveRepoIndex(catalog, repoID)
+	if err != nil {
 		return "", false, err
 	}
 
-	return repoID, true, nil
+	return catalog.Repos[index].ID, true, nil
 }
 
 func validateConfigTagValues(tags []string) error {
@@ -397,7 +398,7 @@ func confirmConfigTagModify(action string, req configTagModifyRequest) error {
 	}
 
 	if isNotTerminal {
-		return fmt.Errorf("config tag %s requires confirmation; rerun with --yes for non-interactive use", action)
+		return fmt.Errorf("tag %s requires confirmation; rerun with --yes for non-interactive use", action)
 	}
 
 	confirmMsg := configTagModifyConfirmText(action, req)
@@ -434,22 +435,4 @@ func configTagModifyConfirmText(action string, req configTagModifyRequest) strin
 	b.WriteString("continue?")
 
 	return b.String()
-}
-
-func loadCatalogForTagCommand() (*fconfig.Catalog, string, error) {
-	runtimeCtx, err := loadConfigRuntimeContext()
-	if err != nil {
-		return nil, "", err
-	}
-
-	return loadCatalogForTagCommandWithRuntimeContext(runtimeCtx)
-}
-
-func loadCatalogForTagCommandWithRuntimeContext(runtimeCtx configRuntimeContext) (*fconfig.Catalog, string, error) {
-	config, err := fconfig.LoadEffectiveConfig(runtimeCtx.HomeDir, runtimeCtx.Cwd, runtimeCtx.XDGConfigHome)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return loadCatalogForEffectiveConfig(config)
 }

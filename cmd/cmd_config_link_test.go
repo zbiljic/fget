@@ -86,7 +86,7 @@ func TestLoadCatalogForEffectiveConfig_MissingCatalog(t *testing.T) {
 	if err == nil {
 		t.Fatal("loadCatalogForEffectiveConfig() error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "run `fget config sync` first") {
+	if !strings.Contains(err.Error(), "run `fget catalog sync` first") {
 		t.Fatalf("loadCatalogForEffectiveConfig() error = %q, want sync hint", err)
 	}
 }

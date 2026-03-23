@@ -10,7 +10,7 @@ import (
 
 var configCmd = &cobra.Command{
 	Use:         "config",
-	Short:       "Manage merged config and repository catalog",
+	Short:       "Manage merged config",
 	Annotations: map[string]string{"group": "config"},
 }
 

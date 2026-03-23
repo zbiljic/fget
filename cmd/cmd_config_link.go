@@ -23,7 +23,7 @@ var configLinkSyncCmd = &cobra.Command{
 }
 
 func init() {
-	configCmd.AddCommand(configLinkCmd)
+	rootCmd.AddCommand(configLinkCmd)
 	configLinkCmd.AddCommand(configLinkSyncCmd)
 }
 
@@ -87,7 +87,7 @@ func loadCatalogForEffectiveConfig(config *fconfig.EffectiveConfig) (*fconfig.Ca
 
 	if _, err := os.Stat(config.Catalog.Path); err != nil {
 		if os.IsNotExist(err) {
-			return nil, "", fmt.Errorf("catalog does not exist at %s; run `fget config sync` first", config.Catalog.Path)
+			return nil, "", fmt.Errorf("catalog does not exist at %s; run `fget catalog sync` first", config.Catalog.Path)
 		}
 		return nil, "", err
 	}
