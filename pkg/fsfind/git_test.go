@@ -74,6 +74,59 @@ func TestGitDirectoriesTreeDetectsRepoWhenDotGitIsFile(t *testing.T) {
 	}
 }
 
+func TestGitDirectoriesTreeFollowsSymlinkedRepoDirectories(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	sourceRepo := filepath.Join(root, "src", "github.com", "example", "app")
+	linkParent := filepath.Join(root, "links", "github.com", "example")
+	linkRepo := filepath.Join(linkParent, "app")
+
+	if err := os.MkdirAll(filepath.Join(sourceRepo, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(sourceRepo/.git): %v", err)
+	}
+	if err := os.MkdirAll(linkParent, 0o755); err != nil {
+		t.Fatalf("MkdirAll(linkParent): %v", err)
+	}
+	if err := os.Symlink(sourceRepo, linkRepo); err != nil {
+		t.Fatalf("Symlink(%q, %q): %v", sourceRepo, linkRepo, err)
+	}
+
+	tree, err := GitDirectoriesTree(filepath.Join(root, "links"))
+	if err != nil {
+		t.Fatalf("GitDirectoriesTree() error = %v", err)
+	}
+
+	if _, ok := tree.Search([]byte(linkRepo)); !ok {
+		t.Fatalf("GitDirectoriesTree() did not include symlinked repo %q", linkRepo)
+	}
+}
+
+func TestGitDirectoriesTreeDoesNotTraverseSymlinkedDirectories(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	realDir := filepath.Join(root, "real")
+	linkedDir := filepath.Join(root, "linked")
+	hiddenRepo := filepath.Join(realDir, "nested", "repo")
+
+	if err := os.MkdirAll(filepath.Join(hiddenRepo, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(hiddenRepo/.git): %v", err)
+	}
+	if err := os.Symlink(realDir, linkedDir); err != nil {
+		t.Fatalf("Symlink(%q, %q): %v", realDir, linkedDir, err)
+	}
+
+	tree, err := GitDirectoriesTree(root)
+	if err != nil {
+		t.Fatalf("GitDirectoriesTree() error = %v", err)
+	}
+
+	if _, ok := tree.Search([]byte(filepath.Join(linkedDir, "nested", "repo"))); ok {
+		t.Fatalf("GitDirectoriesTree() should not traverse symlinked directory %q", linkedDir)
+	}
+}
+
 func TestDirectoryContainsGitRepoMarker(t *testing.T) {
 	t.Parallel()
 

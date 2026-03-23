@@ -69,8 +69,19 @@ func gitDirectoriesUnderRoot(ctx context.Context, tree art.Tree, mu *sync.Mutex,
 			return nil
 		}
 
-		if entry == nil || !entry.IsDir() {
+		if entry == nil {
 			return nil
+		}
+
+		if !entry.IsDir() {
+			if entry.Type()&os.ModeSymlink == 0 {
+				return nil
+			}
+
+			info, err := os.Stat(path)
+			if err != nil || !info.IsDir() {
+				return nil
+			}
 		}
 
 		isRepoRoot, err := pathContainsGitRepoMarker(path)
