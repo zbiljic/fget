@@ -133,6 +133,97 @@ func TestResolveConfigTagModifyRequest_ExplicitRepoSelector(t *testing.T) {
 	}
 }
 
+func TestResolveConfigTagModifyRequest_NormalizesExplicitRepoURLSelector(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "example.com/acme/repo",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/repo"},
+				},
+			},
+		},
+	}
+
+	req, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"https://example.com/acme/repo", "team:alpha"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			t.Fatal("gitRoot should not be called when explicit repo selector is provided")
+			return "", nil
+		},
+		func(context.Context, ...string) ([]string, error) {
+			t.Fatal("findRepos should not be called when explicit repo selector is provided")
+			return nil, nil
+		},
+		func(string) (fconfig.RepoMetadata, error) {
+			t.Fatal("inspectRepo should not be called when explicit repo selector is provided")
+			return fconfig.RepoMetadata{}, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(req.RepoSelectors, []string{"example.com/acme/repo"}) {
+		t.Fatalf(
+			"resolveConfigTagModifyRequest() selectors = %v, want %v",
+			req.RepoSelectors,
+			[]string{"example.com/acme/repo"},
+		)
+	}
+	if !reflect.DeepEqual(req.Tags, []string{"team:alpha"}) {
+		t.Fatalf("resolveConfigTagModifyRequest() tags = %v, want %v", req.Tags, []string{"team:alpha"})
+	}
+	if req.RequiresConfirmation {
+		t.Fatal("resolveConfigTagModifyRequest() RequiresConfirmation = true, want false")
+	}
+}
+
+func TestResolveConfigTagModifyRequest_RejectsURLTag(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "github.com/acme/api",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/api"},
+				},
+			},
+		},
+	}
+
+	_, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"github.com/acme/api", "https://example.com/acme/another-repo"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			t.Fatal("gitRoot should not be called when explicit repo selector is provided")
+			return "", nil
+		},
+		func(context.Context, ...string) ([]string, error) {
+			t.Fatal("findRepos should not be called when explicit repo selector is provided")
+			return nil, nil
+		},
+		func(string) (fconfig.RepoMetadata, error) {
+			t.Fatal("inspectRepo should not be called when explicit repo selector is provided")
+			return fconfig.RepoMetadata{}, nil
+		},
+	)
+	if err == nil {
+		t.Fatal("resolveConfigTagModifyRequest() expected error")
+	}
+	if !strings.Contains(err.Error(), "tag") || !strings.Contains(err.Error(), "URL") {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %q, want URL tag validation error", err)
+	}
+}
+
 func TestResolveConfigTagModifyRequest_BulkFromSearchWhenOutsideRepo(t *testing.T) {
 	t.Parallel()
 

@@ -235,15 +235,27 @@ func resolveConfigTagModifyRequest(
 	}
 
 	if len(args) >= 2 {
-		if _, err := fconfig.ResolveRepoIndex(catalog, args[0]); err == nil {
+		repoSelector, matched, err := resolveExplicitConfigTagRepoSelector(catalog, args[0])
+		if err != nil {
+			return configTagModifyRequest{}, err
+		}
+		if matched {
+			if err := validateConfigTagValues(args[1:]); err != nil {
+				return configTagModifyRequest{}, err
+			}
+
 			return configTagModifyRequest{
-				RepoSelectors: []string{args[0]},
+				RepoSelectors: []string{repoSelector},
 				Tags:          args[1:],
 			}, nil
 		}
 	}
 
 	if repoRoot, err := gitRoot(cwd); err == nil {
+		if err := validateConfigTagValues(args); err != nil {
+			return configTagModifyRequest{}, err
+		}
+
 		return configTagModifyRequest{
 			RepoSelectors: []string{repoRoot},
 			Tags:          args,
@@ -255,11 +267,65 @@ func resolveConfigTagModifyRequest(
 		return configTagModifyRequest{}, err
 	}
 
+	if err := validateConfigTagValues(args); err != nil {
+		return configTagModifyRequest{}, err
+	}
+
 	return configTagModifyRequest{
 		RepoSelectors:        repoSelectors,
 		Tags:                 args,
 		RequiresConfirmation: true,
 	}, nil
+}
+
+func resolveExplicitConfigTagRepoSelector(catalog *fconfig.Catalog, selector string) (string, bool, error) {
+	if _, err := fconfig.ResolveRepoIndex(catalog, selector); err == nil {
+		return selector, true, nil
+	}
+
+	if !looksLikeRemoteRepoURL(selector) {
+		return "", false, nil
+	}
+
+	repoID, err := gitRemoteURLProjectID(selector)
+	if err != nil {
+		return "", false, fmt.Errorf("invalid repository URL %q: %w", selector, err)
+	}
+
+	if _, err := fconfig.ResolveRepoIndex(catalog, repoID); err != nil {
+		return "", false, err
+	}
+
+	return repoID, true, nil
+}
+
+func validateConfigTagValues(tags []string) error {
+	for _, tag := range tags {
+		if looksLikeRemoteRepoURL(tag) {
+			return fmt.Errorf("tag %q must not be a repository URL", tag)
+		}
+	}
+
+	return nil
+}
+
+func looksLikeRemoteRepoURL(value string) bool {
+	if hasScheme(value) {
+		return true
+	}
+
+	atIndex := strings.Index(value, "@")
+	if atIndex <= 0 {
+		return false
+	}
+
+	remainder := value[atIndex+1:]
+	colonIndex := strings.Index(remainder, ":")
+	if colonIndex <= 0 {
+		return false
+	}
+
+	return strings.Contains(remainder[colonIndex+1:], "/")
 }
 
 func resolveCatalogRepoSelectorsBySearch(
