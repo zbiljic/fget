@@ -148,32 +148,95 @@ func repoMatchesLinkTags(repo RepoEntry, spec LinkConfig) bool {
 }
 
 func selectLinkSourcePath(repo RepoEntry, sourceRoot string) (string, error) {
-	switch len(repo.Locations) {
-	case 0:
+	if len(repo.Locations) == 0 {
 		return "", errors.New("repository has no catalog locations")
-	case 1:
-		return filepath.Clean(repo.Locations[0].Path), nil
 	}
 
-	if sourceRoot == "" {
-		return "", errors.New("repository has multiple catalog locations; set link.source_root")
-	}
-
-	matches := make([]string, 0, len(repo.Locations))
+	candidates := make([]RepoLocation, 0, len(repo.Locations))
 	for _, location := range repo.Locations {
-		locationPath := filepath.Clean(location.Path)
-		if isPathUnderRoot(locationPath, sourceRoot) {
-			matches = append(matches, locationPath)
+		location.Path = filepath.Clean(location.Path)
+		if sourceRoot == "" {
+			candidates = append(candidates, location)
+			continue
+		}
+
+		if isPathUnderRoot(location.Path, sourceRoot) {
+			candidates = append(candidates, location)
 		}
 	}
 
-	switch len(matches) {
+	switch len(candidates) {
 	case 0:
+		if sourceRoot == "" {
+			return "", errors.New("repository has no catalog locations")
+		}
 		return "", fmt.Errorf("repository has no catalog location under source_root %s", sourceRoot)
 	case 1:
-		return matches[0], nil
+		return candidates[0].Path, nil
 	default:
-		return "", fmt.Errorf("repository has multiple locations under source_root %s", sourceRoot)
+		return selectPreferredLinkSourcePath(candidates), nil
+	}
+}
+
+func selectPreferredLinkSourcePath(locations []RepoLocation) string {
+	best := locations[0]
+	bestExists := pathExists(best.Path)
+
+	for _, location := range locations[1:] {
+		locationExists := pathExists(location.Path)
+		if locationExists != bestExists {
+			if locationExists {
+				best = location
+				bestExists = true
+			}
+			continue
+		}
+
+		if location.LastSeenAt.After(best.LastSeenAt) {
+			best = location
+			bestExists = locationExists
+			continue
+		}
+		if best.LastSeenAt.After(location.LastSeenAt) {
+			continue
+		}
+
+		if compareLinkSourcePathTieBreak(location.Path, best.Path) < 0 {
+			best = location
+			bestExists = locationExists
+		}
+	}
+
+	return best.Path
+}
+
+func compareLinkSourcePathTieBreak(a, b string) int {
+	aInfo, aErr := os.Stat(a)
+	bInfo, bErr := os.Stat(b)
+
+	switch {
+	case aErr == nil && bErr == nil:
+		aMod := aInfo.ModTime().UTC()
+		bMod := bInfo.ModTime().UTC()
+		if !aMod.Equal(bMod) {
+			if aMod.After(bMod) {
+				return -1
+			}
+			return 1
+		}
+	case aErr == nil:
+		return -1
+	case bErr == nil:
+		return 1
+	}
+
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
 	}
 }
 
