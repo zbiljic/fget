@@ -224,6 +224,30 @@ func TestResolveConfigTagModifyRequest_RejectsURLTag(t *testing.T) {
 	}
 }
 
+func TestResolveConfigTagListSelector_NormalizesExplicitRepoURLSelector(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "example.com/acme/repo",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/repo"},
+				},
+			},
+		},
+	}
+
+	selector, err := resolveConfigTagListSelector(catalog, "https://example.com/acme/repo")
+	if err != nil {
+		t.Fatalf("resolveConfigTagListSelector() error = %v", err)
+	}
+
+	if selector != "example.com/acme/repo" {
+		t.Fatalf("resolveConfigTagListSelector() = %q, want %q", selector, "example.com/acme/repo")
+	}
+}
+
 func TestResolveConfigTagModifyRequest_BulkFromSearchWhenOutsideRepo(t *testing.T) {
 	t.Parallel()
 

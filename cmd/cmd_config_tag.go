@@ -174,7 +174,12 @@ func runConfigTagList(_ *cobra.Command, args []string) error {
 	}
 
 	if len(args) == 1 {
-		index, err := fconfig.ResolveRepoIndex(catalog, args[0])
+		selector, err := resolveConfigTagListSelector(catalog, args[0])
+		if err != nil {
+			return err
+		}
+
+		index, err := fconfig.ResolveRepoIndex(catalog, selector)
 		if err != nil {
 			return err
 		}
@@ -199,6 +204,18 @@ func runConfigTagList(_ *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func resolveConfigTagListSelector(catalog *fconfig.Catalog, selector string) (string, error) {
+	normalizedSelector, matched, err := resolveExplicitConfigTagRepoSelector(catalog, selector)
+	if err != nil {
+		return "", err
+	}
+	if matched {
+		return normalizedSelector, nil
+	}
+
+	return selector, nil
 }
 
 func parseConfigTagModifyArgs(args []string, cwd string, gitRoot configTagGitRootFn) (string, []string, error) {
