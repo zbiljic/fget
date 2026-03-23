@@ -299,22 +299,7 @@ func gitMakeClean(ctx context.Context, repoPath string) error {
 }
 
 func gitIsClean(ctx context.Context, repoPath string) (bool, error) {
-	repo, err := git.PlainOpen(repoPath)
-	if err != nil {
-		return false, err
-	}
-
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return false, err
-	}
-
-	status, err := worktree.Status()
-	if err != nil {
-		return false, err
-	}
-
-	return status.IsClean(), nil
+	return gitRepoIsCleanContext(ctx, repoPath)
 }
 
 func gitReset(ctx context.Context, repoPath string, commit plumbing.Hash) error {

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -38,5 +40,51 @@ func TestInspectSyncRepoMetadata(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("inspectSyncRepoMetadata() = %+v, want %+v", got, want)
+	}
+}
+
+func TestGitMetadataHelpersRespectCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	tests := []struct {
+		name string
+		run  func(context.Context) error
+	}{
+		{
+			name: "status",
+			run: func(ctx context.Context) error {
+				_, err := gitRepoIsCleanContext(ctx, t.TempDir())
+				return err
+			},
+		},
+		{
+			name: "last commit date",
+			run: func(ctx context.Context) error {
+				_, err := gitLastCommitDateContext(ctx, t.TempDir())
+				return err
+			},
+		},
+		{
+			name: "commit count",
+			run: func(ctx context.Context) error {
+				_, err := gitRepoCommitCountContext(ctx, t.TempDir())
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.run(ctx)
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("%s error = %v, want %v", tt.name, err, context.Canceled)
+			}
+		})
 	}
 }

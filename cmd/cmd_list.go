@@ -285,6 +285,10 @@ func runListDetailedOutput(
 }
 
 func processRepoInfo(ctx context.Context, repoPath string, opts listOptions) (*repoInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	project, url, ref, err := gitProjectInfo(repoPath)
 	if err != nil {
 		return nil, err
@@ -300,17 +304,29 @@ func processRepoInfo(ctx context.Context, repoPath string, opts listOptions) (*r
 		return nil, nil
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	isClean, err := gitIsClean(ctx, repoPath)
 	if err != nil {
 		return nil, err
 	}
 
-	lastUpdated, err := gitLastCommitDate(repoPath)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	lastUpdated, err := gitLastCommitDateContext(ctx, repoPath)
 	if err != nil {
 		return nil, err
 	}
 
-	commitCount, err := gitRepoCommitCount(repoPath)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	commitCount, err := gitRepoCommitCountContext(ctx, repoPath)
 	if err != nil {
 		return nil, err
 	}
