@@ -130,23 +130,27 @@ func TestOutputTableStateColumn(t *testing.T) {
 	now := time.Now()
 	active := true
 	inactive := false
+	clean := true
+	dirty := false
+	commitsOne := 3
+	commitsTwo := 7
 	repos := []repoInfo{
 		{
 			Path:        "github.com/example/one",
 			URL:         "https://github.com/example/one.git",
 			Branch:      "main",
-			IsClean:     true,
-			LastUpdated: now,
-			CommitCount: 3,
+			IsClean:     &clean,
+			LastUpdated: &now,
+			CommitCount: &commitsOne,
 			Active:      &active,
 		},
 		{
 			Path:        "github.com/example/two",
 			URL:         "https://github.com/example/two.git",
 			Branch:      "master",
-			IsClean:     false,
-			LastUpdated: now,
-			CommitCount: 7,
+			IsClean:     &dirty,
+			LastUpdated: &now,
+			CommitCount: &commitsTwo,
 			Active:      &inactive,
 		},
 	}
@@ -168,5 +172,26 @@ func TestOutputTableStateColumn(t *testing.T) {
 	}
 	if strings.Contains(withoutState.String(), "State") {
 		t.Fatalf("outputTable(without state) should not contain State header:\n%s", withoutState.String())
+	}
+}
+
+func TestOutputTableDisplaysSkippedMetadata(t *testing.T) {
+	t.Parallel()
+
+	repos := []repoInfo{
+		{
+			Path:   "github.com/example/link",
+			URL:    "https://github.com/example/link.git",
+			Branch: "main",
+		},
+	}
+
+	var out strings.Builder
+	if err := outputTable(&out, repos, false); err != nil {
+		t.Fatalf("outputTable() error = %v", err)
+	}
+
+	if !strings.Contains(out.String(), "| - ") {
+		t.Fatalf("outputTable() should render skipped metadata as '-':\n%s", out.String())
 	}
 }

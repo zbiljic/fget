@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -83,13 +84,13 @@ type listOptions struct {
 }
 
 type repoInfo struct {
-	Path        string    `json:"path"`
-	URL         string    `json:"url"`
-	Branch      string    `json:"branch,omitempty"`
-	IsClean     bool      `json:"is_clean,omitempty"`
-	LastUpdated time.Time `json:"last_updated,omitempty"`
-	CommitCount int       `json:"commit_count,omitempty"`
-	Active      *bool     `json:"active,omitempty"`
+	Path        string     `json:"path"`
+	URL         string     `json:"url"`
+	Branch      string     `json:"branch,omitempty"`
+	IsClean     *bool      `json:"is_clean,omitempty"`
+	LastUpdated *time.Time `json:"last_updated,omitempty"`
+	CommitCount *int       `json:"commit_count,omitempty"`
+	Active      *bool      `json:"active,omitempty"`
 }
 
 const (
@@ -248,14 +249,12 @@ func runListDetailedOutput(
 
 			switch field {
 			case "time", "date", "updated":
-				// Sort by last update time
-				result = repos[i].LastUpdated.After(repos[j].LastUpdated)
+				result = compareOptionalTimesDesc(repos[i].LastUpdated, repos[j].LastUpdated, repos[i].Path, repos[j].Path)
 			case "name", "path":
 				// Sort by repository name/path
 				result = repos[i].Path < repos[j].Path
 			case "commits", "count":
-				// Sort by commit count
-				result = repos[i].CommitCount > repos[j].CommitCount
+				result = compareOptionalIntsDesc(repos[i].CommitCount, repos[j].CommitCount, repos[i].Path, repos[j].Path)
 			default:
 				// Default to sorting by path
 				result = repos[i].Path < repos[j].Path
@@ -304,31 +303,49 @@ func processRepoInfo(ctx context.Context, repoPath string, opts listOptions) (*r
 		return nil, nil
 	}
 
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	isClean, err := gitIsClean(ctx, repoPath)
+	symlinked, err := isSymlinkPath(repoPath)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	lastUpdated, err := gitLastCommitDateContext(ctx, repoPath)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		isClean     *bool
+		lastUpdated *time.Time
+		commitCount *int
+	)
 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	commitCount, err := gitRepoCommitCountContext(ctx, repoPath)
+	if !symlinked {
+		clean, err := gitIsClean(ctx, repoPath)
+		if err != nil {
+			return nil, err
+		}
+		isClean = &clean
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	lastCommitDate, err := gitLastCommitDateContext(ctx, repoPath)
 	if err != nil {
 		return nil, err
+	}
+	lastUpdated = &lastCommitDate
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	if !symlinked {
+		count, err := gitRepoCommitCountContext(ctx, repoPath)
+		if err != nil {
+			return nil, err
+		}
+		commitCount = &count
 	}
 
 	repo := &repoInfo{
@@ -344,6 +361,15 @@ func processRepoInfo(ctx context.Context, repoPath string, opts listOptions) (*r
 	}
 
 	return repo, nil
+}
+
+func isSymlinkPath(path string) (bool, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false, err
+	}
+
+	return info.Mode()&os.ModeSymlink != 0, nil
 }
 
 func isListSkippableRepoError(err error) bool {
@@ -468,6 +494,15 @@ func outputTable(w io.Writer, repos []repoInfo, showState bool) error {
 				maxStateWidth = len(stateLabel)
 			}
 		}
+		if statusText := formatRepoStatus(repo.IsClean); len(statusText) > maxStatusWidth {
+			maxStatusWidth = len(statusText)
+		}
+		if lastUpdatedText := formatRepoLastUpdated(repo.LastUpdated, lastUpdatedFormat); len(lastUpdatedText) > maxLastUpdatedWidth {
+			maxLastUpdatedWidth = len(lastUpdatedText)
+		}
+		if commitCountText := formatRepoCommitCount(repo.CommitCount); len(commitCountText) > maxCommitCountWidth {
+			maxCommitCountWidth = len(commitCountText)
+		}
 	}
 
 	// Add some padding
@@ -533,10 +568,9 @@ func outputTable(w io.Writer, repos []repoInfo, showState bool) error {
 
 	// Write table rows with padded columns
 	for _, repo := range repos {
-		status := "clean"
-		if !repo.IsClean {
-			status = "modified"
-		}
+		status := formatRepoStatus(repo.IsClean)
+		lastUpdated := formatRepoLastUpdated(repo.LastUpdated, lastUpdatedFormat)
+		commitCount := formatRepoCommitCount(repo.CommitCount)
 
 		if showState {
 			stateText := ""
@@ -544,31 +578,84 @@ func outputTable(w io.Writer, repos []repoInfo, showState bool) error {
 				stateText = formatRepoState(*repo.Active)
 			}
 
-			row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*d |\n",
+			row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n",
 				maxPathWidth, repo.Path,
 				maxURLWidth, repo.URL,
 				maxBranchWidth, repo.Branch,
 				maxStatusWidth, status,
 				maxStateWidth, stateText,
-				maxLastUpdatedWidth, repo.LastUpdated.Format(lastUpdatedFormat),
-				maxCommitCountWidth, repo.CommitCount)
+				maxLastUpdatedWidth, lastUpdated,
+				maxCommitCountWidth, commitCount)
 			if _, err := io.WriteString(w, row); err != nil {
 				return err
 			}
 			continue
 		}
 
-		row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*d |\n",
+		row := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n",
 			maxPathWidth, repo.Path,
 			maxURLWidth, repo.URL,
 			maxBranchWidth, repo.Branch,
 			maxStatusWidth, status,
-			maxLastUpdatedWidth, repo.LastUpdated.Format(lastUpdatedFormat),
-			maxCommitCountWidth, repo.CommitCount)
+			maxLastUpdatedWidth, lastUpdated,
+			maxCommitCountWidth, commitCount)
 		if _, err := io.WriteString(w, row); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func compareOptionalTimesDesc(left, right *time.Time, leftPath, rightPath string) bool {
+	switch {
+	case left == nil && right == nil:
+		return leftPath < rightPath
+	case left == nil:
+		return false
+	case right == nil:
+		return true
+	default:
+		return left.After(*right)
+	}
+}
+
+func compareOptionalIntsDesc(left, right *int, leftPath, rightPath string) bool {
+	switch {
+	case left == nil && right == nil:
+		return leftPath < rightPath
+	case left == nil:
+		return false
+	case right == nil:
+		return true
+	default:
+		return *left > *right
+	}
+}
+
+func formatRepoStatus(isClean *bool) string {
+	if isClean == nil {
+		return "-"
+	}
+	if *isClean {
+		return "clean"
+	}
+
+	return "modified"
+}
+
+func formatRepoLastUpdated(lastUpdated *time.Time, layout string) string {
+	if lastUpdated == nil {
+		return "-"
+	}
+
+	return lastUpdated.Format(layout)
+}
+
+func formatRepoCommitCount(commitCount *int) string {
+	if commitCount == nil {
+		return "-"
+	}
+
+	return fmt.Sprintf("%d", *commitCount)
 }
