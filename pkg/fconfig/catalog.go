@@ -205,10 +205,6 @@ func MergeCatalogs(catalogs ...*Catalog) *Catalog {
 	return merged
 }
 
-func normalizeCatalog(c *Catalog) {
-	normalizeLoadedCatalog(c)
-}
-
 func normalizeLoadedCatalog(c *Catalog) {
 	if c.Version == "" {
 		c.Version = CatalogVersionV1
