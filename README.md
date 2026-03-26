@@ -38,15 +38,16 @@ Ensure that your `GOBIN` is in your system's `PATH` (e.g., `export PATH=$PATH:$(
 
 ### Building from source
 
-Alternatively, you can clone the repository and build `fget` yourself. This method requires `make`.
+Alternatively, you can clone the repository and build `fget` yourself. This method requires `mise`.
 
 ```bash
 git clone https://github.com/zbiljic/fget.git
 cd fget
-make install
+mise install
+mise run install
 ```
 
-The `make install` command will compile the `fget` executable and place it in your `GOBIN` directory.
+`mise install` installs the pinned project tooling, and `mise run install` compiles the `fget` executable and places it in your `GOBIN` directory.
 
 ## Usage
 
@@ -267,7 +268,7 @@ Contributions are welcome!
 1.  Fork the repository.
 2.  Create a new feature branch.
 3.  Make your changes.
-4.  Ensure all checks pass by running `make pre-commit`.
+4.  Ensure all checks pass by running `mise run pre-commit`.
 5.  Submit a pull request.
 
 ## License
