@@ -149,6 +149,7 @@ fget list ~/src
 - When you run `fget` inside that scope, `catalog`, `tag`, and `link` use that scope instead of the global one.
 - `catalog.imports` lets one scope read additional catalogs from other scope owner configs.
 - `catalog sync` only updates the active scope's owned catalog.
+- Catalog roots and repo locations under the scope owner directory are stored with relative `path` values, so moved external-drive scopes can be reloaded on another machine without rewriting the catalog first.
 
 Example config file:
 

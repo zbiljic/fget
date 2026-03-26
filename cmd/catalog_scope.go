@@ -62,7 +62,12 @@ func loadCatalogSetForEffectiveConfig(config *fconfig.EffectiveConfig, homeDir s
 			return nil
 		}
 
-		catalog, err := loadExistingCatalog(catalogPath)
+		scopeRoot := ""
+		if scopePath != "" {
+			scopeRoot = filepath.Dir(scopePath)
+		}
+
+		catalog, err := loadExistingCatalog(catalogPath, scopeRoot)
 		if err != nil {
 			return err
 		}
@@ -127,7 +132,7 @@ func loadCatalogSetForEffectiveConfig(config *fconfig.EffectiveConfig, homeDir s
 	return set, nil
 }
 
-func loadExistingCatalog(path string) (*fconfig.Catalog, error) {
+func loadExistingCatalog(path, scopeRoot string) (*fconfig.Catalog, error) {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("catalog does not exist at %s; run `fget catalog sync` first", path)
@@ -135,7 +140,7 @@ func loadExistingCatalog(path string) (*fconfig.Catalog, error) {
 		return nil, err
 	}
 
-	return fconfig.LoadCatalog(path)
+	return fconfig.LoadCatalogWithScope(path, scopeRoot)
 }
 
 func (set *catalogSet) resolveWritableSource(selector string) (*catalogSource, error) {

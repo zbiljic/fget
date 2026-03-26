@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	art "github.com/plar/go-adaptive-radix-tree/v2"
@@ -76,7 +77,7 @@ func runConfigSync(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	catalog, err := fconfig.LoadCatalog(config.Catalog.Path)
+	catalog, err := fconfig.LoadCatalogWithScope(config.Catalog.Path, catalogScopeRoot(config))
 	if err != nil {
 		return err
 	}
@@ -201,6 +202,17 @@ func findGitRepoPaths(ctx context.Context, roots ...string) ([]string, error) {
 	})
 
 	return repoPaths, nil
+}
+
+func catalogScopeRoot(config *fconfig.EffectiveConfig) string {
+	if config == nil {
+		return ""
+	}
+	if config.ScopeOwner != "" {
+		return filepath.Dir(config.ScopeOwner)
+	}
+
+	return ""
 }
 
 func inspectRepoMetadata(repoPath string) (fconfig.RepoMetadata, error) {

@@ -78,11 +78,13 @@ func TestLoadSaveCatalog_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	catalogPath := filepath.Join(t.TempDir(), "catalog.yaml")
+	scopeRoot := filepath.Join(t.TempDir(), "scope")
 	catalog := &Catalog{
-		Version: CatalogVersionV1,
+		Version:   CatalogVersionV1,
+		ScopeRoot: scopeRoot,
 		Roots: []CatalogRoot{
 			{
-				Path:          "/repos",
+				Path:          filepath.Join(scopeRoot, "repos"),
 				LastScannedAt: time.Now().UTC(),
 			},
 		},
@@ -92,7 +94,7 @@ func TestLoadSaveCatalog_RoundTrip(t *testing.T) {
 				RemoteURL: "https://github.com/acme/worker",
 				Tags:      []string{"ops"},
 				Locations: []RepoLocation{
-					{Path: "/repos/worker", LastSeenAt: time.Now().UTC()},
+					{Path: filepath.Join(scopeRoot, "repos", "worker"), LastSeenAt: time.Now().UTC()},
 				},
 			},
 		},
@@ -102,9 +104,17 @@ func TestLoadSaveCatalog_RoundTrip(t *testing.T) {
 		t.Fatalf("SaveCatalog() error = %v", err)
 	}
 
-	loaded, err := LoadCatalog(catalogPath)
+	raw, err := os.ReadFile(catalogPath)
 	if err != nil {
-		t.Fatalf("LoadCatalog() error = %v", err)
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(raw), "path: repos/worker") {
+		t.Fatalf("saved catalog should contain relative repo path, got:\n%s", string(raw))
+	}
+
+	loaded, err := LoadCatalogWithScope(catalogPath, scopeRoot)
+	if err != nil {
+		t.Fatalf("LoadCatalogWithScope() error = %v", err)
 	}
 
 	if loaded.Version != CatalogVersionV1 {
@@ -124,6 +134,64 @@ func TestLoadSaveCatalog_RoundTrip(t *testing.T) {
 	}
 	if loaded.UpdatedAt.IsZero() {
 		t.Fatal("loaded updated_at should not be zero")
+	}
+	if loaded.Repos[0].Locations[0].Path != filepath.Join(scopeRoot, "repos", "worker") {
+		t.Fatalf(
+			"loaded location path = %q, want %q",
+			loaded.Repos[0].Locations[0].Path,
+			filepath.Join(scopeRoot, "repos", "worker"),
+		)
+	}
+}
+
+func TestLoadCatalogWithScope_RewritesRelativePathsAgainstCurrentScopeRoot(t *testing.T) {
+	t.Parallel()
+
+	catalogPath := filepath.Join(t.TempDir(), "catalog.yaml")
+	originalScopeRoot := filepath.Join(t.TempDir(), "scope-old")
+	relocatedScopeRoot := filepath.Join(t.TempDir(), "scope-new")
+	now := time.Now().UTC()
+
+	catalog := &Catalog{
+		Version:   CatalogVersionV1,
+		ScopeRoot: originalScopeRoot,
+		Roots: []CatalogRoot{
+			{
+				Path:          filepath.Join(originalScopeRoot, "repos"),
+				LastScannedAt: now,
+			},
+		},
+		Repos: []RepoEntry{
+			{
+				ID:        "github.com/acme/worker",
+				RemoteURL: "https://github.com/acme/worker",
+				Locations: []RepoLocation{
+					{
+						Path:       filepath.Join(originalScopeRoot, "repos", "worker"),
+						LastSeenAt: now,
+					},
+				},
+			},
+		},
+	}
+	if err := SaveCatalog(catalogPath, catalog); err != nil {
+		t.Fatalf("SaveCatalog() error = %v", err)
+	}
+
+	loaded, err := LoadCatalogWithScope(catalogPath, relocatedScopeRoot)
+	if err != nil {
+		t.Fatalf("LoadCatalogWithScope() error = %v", err)
+	}
+
+	if loaded.Roots[0].Path != filepath.Join(relocatedScopeRoot, "repos") {
+		t.Fatalf("loaded root path = %q, want %q", loaded.Roots[0].Path, filepath.Join(relocatedScopeRoot, "repos"))
+	}
+	if loaded.Repos[0].Locations[0].Path != filepath.Join(relocatedScopeRoot, "repos", "worker") {
+		t.Fatalf(
+			"loaded location path = %q, want %q",
+			loaded.Repos[0].Locations[0].Path,
+			filepath.Join(relocatedScopeRoot, "repos", "worker"),
+		)
 	}
 }
 
