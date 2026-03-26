@@ -136,7 +136,7 @@ func buildLinkInitConfig(
 
 func applyLinkInitConfig(target string, linkConfig fconfig.LinkConfig) (*fconfig.Config, error) {
 	config := &fconfig.Config{
-		Version: fconfig.ConfigVersionV1,
+		Version: fconfig.ConfigVersionV2,
 		Link:    &linkConfig,
 	}
 

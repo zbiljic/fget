@@ -32,12 +32,43 @@ func TestDiscoverConfigFiles_HomeToCwdOrder(t *testing.T) {
 		t.Fatalf("WriteFile(projectConfig) error = %v", err)
 	}
 
-	got, err := DiscoverConfigFiles(homeDir, cwd)
+	got, err := DiscoverConfigFiles(cwd)
 	if err != nil {
 		t.Fatalf("DiscoverConfigFiles() error = %v", err)
 	}
 
 	want := []string{homeConfig, rootConfig, projectConfig}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("DiscoverConfigFiles() = %v, want %v", got, want)
+	}
+}
+
+func TestDiscoverConfigFiles_OutsideHomeStillDiscovers(t *testing.T) {
+	t.Parallel()
+
+	workspaceRoot := t.TempDir()
+	cwd := filepath.Join(workspaceRoot, "proj", "sub")
+
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatalf("MkdirAll(cwd) error = %v", err)
+	}
+
+	rootConfig := filepath.Join(workspaceRoot, "fget.yaml")
+	projectConfig := filepath.Join(workspaceRoot, "proj", "fget.yaml")
+
+	if err := os.WriteFile(rootConfig, []byte("version: \"2\"\ncatalog:\n  path: ./catalog.yaml\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(rootConfig) error = %v", err)
+	}
+	if err := os.WriteFile(projectConfig, []byte("version: \"2\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(projectConfig) error = %v", err)
+	}
+
+	got, err := DiscoverConfigFiles(cwd)
+	if err != nil {
+		t.Fatalf("DiscoverConfigFiles() error = %v", err)
+	}
+
+	want := []string{rootConfig, projectConfig}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("DiscoverConfigFiles() = %v, want %v", got, want)
 	}

@@ -79,7 +79,7 @@ func runConfigTagAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	catalog, catalogPath, err := loadCatalogForRuntimeContext(runtimeCtx)
+	set, err := loadCatalogSetForRuntimeContext(runtimeCtx)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func runConfigTagAdd(cmd *cobra.Command, args []string) error {
 		cmd.Context(),
 		args,
 		runtimeCtx.Cwd,
-		catalog,
+		set.View,
 		fsfind.GitRootPath,
 		findGitRepoPaths,
 		inspectRepoMetadata,
@@ -101,14 +101,25 @@ func runConfigTagAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	dirtyCatalogs := make(map[string]struct{})
 	for _, repoSelector := range req.RepoSelectors {
-		if err := fconfig.AddTags(catalog, repoSelector, req.Tags); err != nil {
+		source, err := set.resolveWritableSource(repoSelector)
+		if err != nil {
 			return err
 		}
+		if err := fconfig.AddTags(source.Catalog, repoSelector, req.Tags); err != nil {
+			return err
+		}
+		dirtyCatalogs[source.CatalogPath] = struct{}{}
 	}
 
-	if err := fconfig.SaveCatalog(catalogPath, catalog); err != nil {
-		return err
+	for _, source := range set.Sources {
+		if _, ok := dirtyCatalogs[source.CatalogPath]; !ok {
+			continue
+		}
+		if err := fconfig.SaveCatalog(source.CatalogPath, source.Catalog); err != nil {
+			return err
+		}
 	}
 
 	if len(req.RepoSelectors) == 1 {
@@ -126,7 +137,7 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	catalog, catalogPath, err := loadCatalogForRuntimeContext(runtimeCtx)
+	set, err := loadCatalogSetForRuntimeContext(runtimeCtx)
 	if err != nil {
 		return err
 	}
@@ -135,7 +146,7 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 		cmd.Context(),
 		args,
 		runtimeCtx.Cwd,
-		catalog,
+		set.View,
 		fsfind.GitRootPath,
 		findGitRepoPaths,
 		inspectRepoMetadata,
@@ -148,14 +159,25 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	dirtyCatalogs := make(map[string]struct{})
 	for _, repoSelector := range req.RepoSelectors {
-		if err := fconfig.RemoveTags(catalog, repoSelector, req.Tags); err != nil {
+		source, err := set.resolveWritableSource(repoSelector)
+		if err != nil {
 			return err
 		}
+		if err := fconfig.RemoveTags(source.Catalog, repoSelector, req.Tags); err != nil {
+			return err
+		}
+		dirtyCatalogs[source.CatalogPath] = struct{}{}
 	}
 
-	if err := fconfig.SaveCatalog(catalogPath, catalog); err != nil {
-		return err
+	for _, source := range set.Sources {
+		if _, ok := dirtyCatalogs[source.CatalogPath]; !ok {
+			continue
+		}
+		if err := fconfig.SaveCatalog(source.CatalogPath, source.Catalog); err != nil {
+			return err
+		}
 	}
 
 	if len(req.RepoSelectors) == 1 {
@@ -168,27 +190,27 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigTagList(_ *cobra.Command, args []string) error {
-	catalog, _, err := loadCatalogForCurrentRuntimeContext()
+	set, err := loadCatalogSetForCurrentRuntimeContext()
 	if err != nil {
 		return err
 	}
 
 	if len(args) == 1 {
-		selector, err := resolveConfigTagListSelector(catalog, args[0])
+		selector, err := resolveConfigTagListSelector(set.View, args[0])
 		if err != nil {
 			return err
 		}
 
-		index, err := fconfig.ResolveRepoIndex(catalog, selector)
+		index, err := fconfig.ResolveRepoIndex(set.View, selector)
 		if err != nil {
 			return err
 		}
-		pterm.Printf("%s\t%s\n", catalog.Repos[index].ID, strings.Join(catalog.Repos[index].Tags, ","))
+		pterm.Printf("%s\t%s\n", set.View.Repos[index].ID, strings.Join(set.View.Repos[index].Tags, ","))
 		return nil
 	}
 
-	repos := make([]fconfig.RepoEntry, 0, len(catalog.Repos))
-	for _, repo := range catalog.Repos {
+	repos := make([]fconfig.RepoEntry, 0, len(set.View.Repos))
+	for _, repo := range set.View.Repos {
 		if len(repo.Tags) == 0 {
 			continue
 		}

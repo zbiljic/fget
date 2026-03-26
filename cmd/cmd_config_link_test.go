@@ -74,19 +74,19 @@ func TestResolveLinkConfigForRuntimeContext_LoadsNearestLinkConfig(t *testing.T)
 	}
 }
 
-func TestLoadCatalogForEffectiveConfig_MissingCatalog(t *testing.T) {
+func TestLoadCatalogSetForEffectiveConfig_MissingCatalog(t *testing.T) {
 	t.Parallel()
 
 	homeDir := t.TempDir()
-	_, _, err := loadCatalogForEffectiveConfig(&fconfig.EffectiveConfig{
+	_, err := loadCatalogSetForEffectiveConfig(&fconfig.EffectiveConfig{
 		Config: fconfig.Config{
 			Catalog: fconfig.CatalogConfig{Path: filepath.Join(homeDir, "missing", "catalog.yaml")},
 		},
-	})
+	}, homeDir)
 	if err == nil {
-		t.Fatal("loadCatalogForEffectiveConfig() error = nil, want error")
+		t.Fatal("loadCatalogSetForEffectiveConfig() error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), "run `fget catalog sync` first") {
-		t.Fatalf("loadCatalogForEffectiveConfig() error = %q, want sync hint", err)
+		t.Fatalf("loadCatalogSetForEffectiveConfig() error = %q, want sync hint", err)
 	}
 }

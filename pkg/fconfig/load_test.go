@@ -146,3 +146,156 @@ func TestLoadEffectiveConfig_UsesNearestLinkConfig(t *testing.T) {
 		t.Fatalf("effective link source_root = %q, want %q", eff.Link.SourceRoot, wantSourceRoot)
 	}
 }
+
+func TestLoadEffectiveConfig_ResolvesRootsRelativeToDeclaringFile(t *testing.T) {
+	t.Parallel()
+
+	homeDir := t.TempDir()
+	cwd := filepath.Join(homeDir, "dev", "proj", "nested")
+
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatalf("MkdirAll(cwd) error = %v", err)
+	}
+
+	configPath := filepath.Join(homeDir, "dev", "fget.yaml")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(configDir) error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte("version: \"1\"\nroots:\n  - ./src\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(configPath) error = %v", err)
+	}
+
+	eff, err := LoadEffectiveConfig(homeDir, cwd, "")
+	if err != nil {
+		t.Fatalf("LoadEffectiveConfig() error = %v", err)
+	}
+
+	wantRoots := []string{filepath.Join(homeDir, "dev", "src")}
+	if !reflect.DeepEqual(eff.Roots, wantRoots) {
+		t.Fatalf("effective roots = %v, want %v", eff.Roots, wantRoots)
+	}
+}
+
+func TestLoadConfigFile_ResolvesCatalogImportsToConfigFiles(t *testing.T) {
+	t.Parallel()
+
+	homeDir := t.TempDir()
+	scopeDir := filepath.Join(homeDir, "dev", "scope")
+	configPath := filepath.Join(scopeDir, "fget.yaml")
+
+	if err := os.MkdirAll(scopeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(scopeDir) error = %v", err)
+	}
+	content := "" +
+		"version: \"2\"\n" +
+		"catalog:\n" +
+		"  path: ./catalog.yaml\n" +
+		"  imports:\n" +
+		"    - ../drive-a\n" +
+		"    - ../drive-b/fget.yaml\n"
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile(configPath) error = %v", err)
+	}
+
+	cfg, err := LoadConfigFile(configPath, homeDir)
+	if err != nil {
+		t.Fatalf("LoadConfigFile() error = %v", err)
+	}
+
+	want := []string{
+		filepath.Join(homeDir, "dev", "drive-a", "fget.yaml"),
+		filepath.Join(homeDir, "dev", "drive-b", "fget.yaml"),
+	}
+	if !reflect.DeepEqual(cfg.Catalog.Imports, want) {
+		t.Fatalf("catalog.imports = %v, want %v", cfg.Catalog.Imports, want)
+	}
+}
+
+func TestLoadEffectiveConfig_V2ScopeOwnerIsolatesOuterConfigs(t *testing.T) {
+	t.Parallel()
+
+	homeDir := t.TempDir()
+	xdgConfigHome := filepath.Join(homeDir, "xdg")
+	baseConfigPath := ResolveBaseConfigPath(xdgConfigHome, homeDir)
+
+	if err := os.MkdirAll(filepath.Dir(baseConfigPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(baseConfigDir) error = %v", err)
+	}
+	baseConfig := "" +
+		"version: \"2\"\n" +
+		"roots:\n" +
+		"  - ~/dev/base\n" +
+		"catalog:\n" +
+		"  path: ~/catalogs/home.yaml\n"
+	if err := os.WriteFile(baseConfigPath, []byte(baseConfig), 0o644); err != nil {
+		t.Fatalf("WriteFile(baseConfigPath) error = %v", err)
+	}
+
+	scopeRoot := t.TempDir()
+	cwd := filepath.Join(scopeRoot, "proj", "nested")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatalf("MkdirAll(cwd) error = %v", err)
+	}
+
+	scopeConfigPath := filepath.Join(scopeRoot, "fget.yaml")
+	scopeConfig := "" +
+		"version: \"2\"\n" +
+		"roots:\n" +
+		"  - ./src\n" +
+		"catalog:\n" +
+		"  path: ./catalog.yaml\n"
+	if err := os.WriteFile(scopeConfigPath, []byte(scopeConfig), 0o644); err != nil {
+		t.Fatalf("WriteFile(scopeConfigPath) error = %v", err)
+	}
+
+	projectConfigPath := filepath.Join(scopeRoot, "proj", "fget.yaml")
+	projectConfig := "" +
+		"version: \"2\"\n" +
+		"roots:\n" +
+		"  - ./nested-src\n" +
+		"link:\n" +
+		"  tags:\n" +
+		"    - ext\n"
+	if err := os.WriteFile(projectConfigPath, []byte(projectConfig), 0o644); err != nil {
+		t.Fatalf("WriteFile(projectConfigPath) error = %v", err)
+	}
+
+	eff, err := LoadEffectiveConfig(homeDir, cwd, xdgConfigHome)
+	if err != nil {
+		t.Fatalf("LoadEffectiveConfig() error = %v", err)
+	}
+
+	wantRoots := []string{
+		filepath.Join(scopeRoot, "src"),
+		filepath.Join(scopeRoot, "proj", "nested-src"),
+	}
+	if !reflect.DeepEqual(eff.Roots, wantRoots) {
+		t.Fatalf("effective roots = %v, want %v", eff.Roots, wantRoots)
+	}
+
+	wantSources := []string{scopeConfigPath, projectConfigPath}
+	if !reflect.DeepEqual(eff.Sources, wantSources) {
+		t.Fatalf("effective sources = %v, want %v", eff.Sources, wantSources)
+	}
+
+	wantCatalogPath := filepath.Join(scopeRoot, "catalog.yaml")
+	if eff.Catalog.Path != wantCatalogPath {
+		t.Fatalf("effective catalog path = %q, want %q", eff.Catalog.Path, wantCatalogPath)
+	}
+	if eff.ScopeOwner != scopeConfigPath {
+		t.Fatalf("effective scope owner = %q, want %q", eff.ScopeOwner, scopeConfigPath)
+	}
+	if containsString(eff.Roots, filepath.Join(homeDir, "dev", "base")) {
+		t.Fatalf("effective roots unexpectedly include base scope roots: %v", eff.Roots)
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+
+	return false
+}

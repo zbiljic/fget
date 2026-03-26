@@ -140,17 +140,51 @@ fget list ~/src
 `fget` supports a merged configuration model and a machine-managed repository catalog:
 
 - Global base config: `$XDG_CONFIG_HOME/fget/fget.yaml` or `~/.config/fget/fget.yaml`
-- Overlay configs: `fget.yaml` files discovered from your home directory down to your current directory
+- Overlay configs: `fget.yaml` files discovered from the filesystem root down to your current directory
 - Catalog file: `$XDG_CONFIG_HOME/fget/catalog.yaml` or `~/.config/fget/catalog.yaml`
+
+`version: "2"` introduces catalog scopes:
+
+- A `fget.yaml` with `catalog.path` owns its own catalog scope.
+- When you run `fget` inside that scope, `catalog`, `tag`, and `link` use that scope instead of the global one.
+- `catalog.imports` lets one scope read additional catalogs from other scope owner configs.
+- `catalog sync` only updates the active scope's owned catalog.
 
 Example config file:
 
 ```yaml
-version: "1"
+version: "2"
 roots:
   - ~/dev
 catalog:
   path: "~/.config/fget/catalog.yaml"
+```
+
+Example external-drive scope:
+
+```yaml
+version: "2"
+roots:
+  - ./manual__src___
+  - ./q__large__src___
+  - ./q__manual__src___
+  - ./q__old__src___
+  - ./src
+catalog:
+  path: ./catalog.yaml
+```
+
+Example global scope importing external catalogs:
+
+```yaml
+version: "2"
+roots:
+  - ~/dev/src
+catalog:
+  path: ~/.config/fget/catalog.yaml
+  imports:
+    - /Volumes/samsung_T9/dev
+    - /Volumes/work_t7/dev
 ```
 
 Common commands:
@@ -168,7 +202,7 @@ fget config init --local
 # Write explicit config file (overwrites with minimal config when --force is set)
 fget config init --file ~/tmp/fget.yaml --force
 
-# Show effective merged configuration and resolved catalog path
+# Show effective merged configuration, active scope owner, and resolved catalog paths
 fget config show
 
 # Re-scan roots and update catalog (remove stale entries with --prune)
@@ -196,13 +230,13 @@ cd ~/dev/wtopic___/fs___
 fget link sync
 ```
 
-`config init` creates or updates `fget.yaml`; `catalog sync` creates or refreshes `catalog.yaml`.
+`config init` creates or updates `fget.yaml`; `catalog sync` creates or refreshes the active scope's owned `catalog.yaml`.
 
 Projection directories can reuse the same `fget.yaml` format, or you can generate/update the
 `link:` block with `fget link init <tag...>`:
 
 ```yaml
-version: "1"
+version: "2"
 
 link:
   tags:
@@ -217,7 +251,7 @@ With the example above, any catalog repo tagged `fs___` is projected under the c
 
 `fget link sync` is stateless:
 
-- it reads the shared `catalog.yaml`
+- it reads the active scope's catalog view (owned catalog plus any imported catalogs)
 - it selects matching repos by tag
 - it creates or updates symlinks under `link.root`
 - it removes stale symlinks under that root

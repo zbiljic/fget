@@ -45,12 +45,12 @@ func init() {
 }
 
 func runCatalogList(_ *cobra.Command, args []string) error {
-	catalog, _, err := loadCatalogForCurrentRuntimeContext()
+	set, err := loadCatalogSetForCurrentRuntimeContext()
 	if err != nil {
 		return err
 	}
 
-	repos, err := selectCatalogRepos(catalog, args)
+	repos, err := selectCatalogRepos(set.View, args)
 	if err != nil {
 		return err
 	}
@@ -63,12 +63,12 @@ func runCatalogList(_ *cobra.Command, args []string) error {
 }
 
 func runCatalogShow(_ *cobra.Command, args []string) error {
-	catalog, _, err := loadCatalogForCurrentRuntimeContext()
+	set, err := loadCatalogSetForCurrentRuntimeContext()
 	if err != nil {
 		return err
 	}
 
-	repos, err := selectCatalogRepos(catalog, args)
+	repos, err := selectCatalogRepos(set.View, args)
 	if err != nil {
 		return err
 	}
@@ -90,12 +90,12 @@ func runCatalogShow(_ *cobra.Command, args []string) error {
 }
 
 func runCatalogPaths(_ *cobra.Command, args []string) error {
-	catalog, _, err := loadCatalogForCurrentRuntimeContext()
+	set, err := loadCatalogSetForCurrentRuntimeContext()
 	if err != nil {
 		return err
 	}
 
-	repos, err := selectCatalogRepos(catalog, args)
+	repos, err := selectCatalogRepos(set.View, args)
 	if err != nil {
 		return err
 	}
@@ -112,24 +112,6 @@ func runCatalogPaths(_ *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func loadCatalogForCurrentRuntimeContext() (*fconfig.Catalog, string, error) {
-	runtimeCtx, err := loadConfigRuntimeContext()
-	if err != nil {
-		return nil, "", err
-	}
-
-	return loadCatalogForRuntimeContext(runtimeCtx)
-}
-
-func loadCatalogForRuntimeContext(runtimeCtx configRuntimeContext) (*fconfig.Catalog, string, error) {
-	config, err := fconfig.LoadEffectiveConfig(runtimeCtx.HomeDir, runtimeCtx.Cwd, runtimeCtx.XDGConfigHome)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return loadCatalogForEffectiveConfig(config)
 }
 
 func selectCatalogRepos(catalog *fconfig.Catalog, selectors []string) ([]fconfig.RepoEntry, error) {

@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -38,12 +37,12 @@ func runConfigLinkSync(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	catalog, _, err := loadCatalogForEffectiveConfig(config)
+	set, err := loadCatalogSetForEffectiveConfig(config, runtimeCtx.HomeDir)
 	if err != nil {
 		return err
 	}
 
-	targets, problems := fconfig.ResolveLinkTargets(catalog, *config.Link)
+	targets, problems := fconfig.ResolveLinkTargets(set.View, *config.Link)
 	result, syncErr := fconfig.SyncLinks(config.Link.Root, targets)
 
 	skippedCount := len(problems) + len(result.Skipped)
@@ -78,26 +77,6 @@ func resolveLinkConfigForRuntimeContext(runtimeCtx configRuntimeContext) (*fconf
 		return nil, errors.New("no link configuration found in discovered fget.yaml files")
 	}
 	return config, nil
-}
-
-func loadCatalogForEffectiveConfig(config *fconfig.EffectiveConfig) (*fconfig.Catalog, string, error) {
-	if config == nil {
-		return nil, "", errors.New("nil effective config")
-	}
-
-	if _, err := os.Stat(config.Catalog.Path); err != nil {
-		if os.IsNotExist(err) {
-			return nil, "", fmt.Errorf("catalog does not exist at %s; run `fget catalog sync` first", config.Catalog.Path)
-		}
-		return nil, "", err
-	}
-
-	catalog, err := fconfig.LoadCatalog(config.Catalog.Path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return catalog, config.Catalog.Path, nil
 }
 
 func printLinkProblems(problems []fconfig.LinkProblem) {

@@ -2,6 +2,7 @@ package fconfig
 
 const (
 	ConfigVersionV1  = "1"
+	ConfigVersionV2  = "2"
 	configFilename   = "fget.yaml"
 	catalogFilename  = "catalog.yaml"
 	configDirname    = "fget"
@@ -9,7 +10,8 @@ const (
 )
 
 type CatalogConfig struct {
-	Path string `yaml:"path" json:"path"`
+	Path    string   `yaml:"path" json:"path"`
+	Imports []string `yaml:"imports,omitempty" json:"imports,omitempty"`
 }
 
 type LinkConfig struct {

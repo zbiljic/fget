@@ -3,27 +3,12 @@ package fconfig
 import (
 	"os"
 	"path/filepath"
-	"strings"
 )
 
-func DiscoverConfigFiles(homeDir, cwd string) ([]string, error) {
-	homeDirAbs, err := filepath.Abs(homeDir)
-	if err != nil {
-		return nil, err
-	}
-
+func DiscoverConfigFiles(cwd string) ([]string, error) {
 	cwdAbs, err := filepath.Abs(cwd)
 	if err != nil {
 		return nil, err
-	}
-
-	relPath, err := filepath.Rel(homeDirAbs, cwdAbs)
-	if err != nil {
-		return nil, err
-	}
-
-	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-		return []string{}, nil
 	}
 
 	files := make([]string, 0)
@@ -33,10 +18,6 @@ func DiscoverConfigFiles(homeDir, cwd string) ([]string, error) {
 		info, err := os.Stat(filename)
 		if err == nil && !info.IsDir() {
 			files = append(files, filename)
-		}
-
-		if path == homeDirAbs {
-			break
 		}
 
 		parent := filepath.Dir(path)

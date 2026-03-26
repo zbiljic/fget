@@ -134,7 +134,7 @@ func applyInitConfig(target string, roots []string, force bool) (*fconfig.Config
 	roots = sortedUnique(roots)
 
 	config := &fconfig.Config{
-		Version: fconfig.ConfigVersionV1,
+		Version: fconfig.ConfigVersionV2,
 		Roots:   roots,
 	}
 

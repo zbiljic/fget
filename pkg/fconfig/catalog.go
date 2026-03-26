@@ -174,6 +174,28 @@ func SaveCatalog(path string, catalog *Catalog) error {
 	return vconfig.SaveConfig(catalog, path)
 }
 
+func MergeCatalogs(catalogs ...*Catalog) *Catalog {
+	merged := newCatalog()
+	repoIndex := make(map[string]int)
+
+	for _, catalog := range catalogs {
+		if catalog == nil {
+			continue
+		}
+
+		normalizeCatalog(catalog)
+		for _, root := range catalog.Roots {
+			merged.UpsertRoot(root.Path, root.LastScannedAt)
+		}
+
+		for _, repo := range catalog.Repos {
+			mergeCatalogRepo(merged, repoIndex, repo)
+		}
+	}
+
+	return merged
+}
+
 func normalizeCatalog(c *Catalog) {
 	if c.Version == "" {
 		c.Version = CatalogVersionV1
@@ -241,4 +263,25 @@ func mergeLocations(existing, incoming []RepoLocation) []RepoLocation {
 	})
 
 	return merged
+}
+
+func mergeCatalogRepo(catalog *Catalog, repoIndex map[string]int, repo RepoEntry) {
+	repo = normalizeRepoEntry(repo)
+
+	if i, ok := repoIndex[repo.ID]; ok {
+		updated := catalog.Repos[i]
+		if repo.RemoteURL != "" {
+			updated.RemoteURL = repo.RemoteURL
+		}
+		updated.Tags = normalizeTags(append(updated.Tags, repo.Tags...))
+		updated.Locations = mergeLocations(updated.Locations, repo.Locations)
+		catalog.Repos[i] = normalizeRepoEntry(updated)
+		return
+	}
+
+	catalog.Repos = append(catalog.Repos, normalizeRepoEntry(repo))
+	repoIndex[repo.ID] = len(catalog.Repos) - 1
+	sort.Slice(catalog.Repos, func(i, j int) bool {
+		return catalog.Repos[i].ID < catalog.Repos[j].ID
+	})
 }

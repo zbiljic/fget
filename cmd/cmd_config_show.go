@@ -21,11 +21,12 @@ func init() {
 }
 
 type configShowOutput struct {
-	Version string                `json:"version"`
-	Roots   []string              `json:"roots"`
-	Catalog fconfig.CatalogConfig `json:"catalog"`
-	Link    *fconfig.LinkConfig   `json:"link,omitempty"`
-	Sources []string              `json:"sources"`
+	Version    string                `json:"version"`
+	Roots      []string              `json:"roots"`
+	Catalog    fconfig.CatalogConfig `json:"catalog"`
+	Link       *fconfig.LinkConfig   `json:"link,omitempty"`
+	Sources    []string              `json:"sources"`
+	ScopeOwner string                `json:"scope_owner,omitempty"`
 }
 
 func runConfigShow(_ *cobra.Command, _ []string) error {
@@ -40,11 +41,12 @@ func runConfigShow(_ *cobra.Command, _ []string) error {
 	}
 
 	out := configShowOutput{
-		Version: config.Version,
-		Roots:   config.Roots,
-		Catalog: config.Catalog,
-		Link:    config.Link,
-		Sources: config.Sources,
+		Version:    config.Version,
+		Roots:      config.Roots,
+		Catalog:    config.Catalog,
+		Link:       config.Link,
+		Sources:    config.Sources,
+		ScopeOwner: config.ScopeOwner,
 	}
 
 	enc, err := json.MarshalIndent(out, "", "  ")

@@ -140,8 +140,8 @@ func TestApplyInitConfig_CreateWhenMissing(t *testing.T) {
 	if !equalStringSlices(config.Roots, wantRoots) {
 		t.Fatalf("roots = %v, want %v", config.Roots, wantRoots)
 	}
-	if config.Version != fconfig.ConfigVersionV1 {
-		t.Fatalf("version = %q, want %q", config.Version, fconfig.ConfigVersionV1)
+	if config.Version != fconfig.ConfigVersionV2 {
+		t.Fatalf("version = %q, want %q", config.Version, fconfig.ConfigVersionV2)
 	}
 
 	saved, err := vconfig.LoadConfig[fconfig.Config](target)
