@@ -189,7 +189,7 @@ func TestLoadConfigFile_ResolvesCatalogImportsToConfigFiles(t *testing.T) {
 	content := "" +
 		"version: \"2\"\n" +
 		"catalog:\n" +
-		"  path: ./catalog.yaml\n" +
+		"  path: ./fget.catalog.yaml\n" +
 		"  imports:\n" +
 		"    - ../drive-a\n" +
 		"    - ../drive-b/fget.yaml\n"
@@ -243,7 +243,7 @@ func TestLoadEffectiveConfig_V2ScopeOwnerIsolatesOuterConfigs(t *testing.T) {
 		"roots:\n" +
 		"  - ./src\n" +
 		"catalog:\n" +
-		"  path: ./catalog.yaml\n"
+		"  path: ./fget.catalog.yaml\n"
 	if err := os.WriteFile(scopeConfigPath, []byte(scopeConfig), 0o644); err != nil {
 		t.Fatalf("WriteFile(scopeConfigPath) error = %v", err)
 	}
@@ -278,7 +278,7 @@ func TestLoadEffectiveConfig_V2ScopeOwnerIsolatesOuterConfigs(t *testing.T) {
 		t.Fatalf("effective sources = %v, want %v", eff.Sources, wantSources)
 	}
 
-	wantCatalogPath := filepath.Join(scopeRoot, "catalog.yaml")
+	wantCatalogPath := filepath.Join(scopeRoot, "fget.catalog.yaml")
 	if eff.Catalog.Path != wantCatalogPath {
 		t.Fatalf("effective catalog path = %q, want %q", eff.Catalog.Path, wantCatalogPath)
 	}

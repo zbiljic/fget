@@ -142,7 +142,7 @@ fget list ~/src
 
 - Global base config: `$XDG_CONFIG_HOME/fget/fget.yaml` or `~/.config/fget/fget.yaml`
 - Overlay configs: `fget.yaml` files discovered from the filesystem root down to your current directory
-- Catalog file: `$XDG_CONFIG_HOME/fget/catalog.yaml` or `~/.config/fget/catalog.yaml`
+- Catalog file: `$XDG_CONFIG_HOME/fget/fget.catalog.yaml` or `~/.config/fget/fget.catalog.yaml`
 
 `version: "2"` introduces catalog scopes:
 
@@ -159,7 +159,7 @@ version: "2"
 roots:
   - ~/dev
 catalog:
-  path: "~/.config/fget/catalog.yaml"
+  path: "~/.config/fget/fget.catalog.yaml"
 ```
 
 Example external-drive scope:
@@ -173,7 +173,7 @@ roots:
   - ./q__old__src___
   - ./src
 catalog:
-  path: ./catalog.yaml
+  path: ./fget.catalog.yaml
 ```
 
 Example global scope importing external catalogs:
@@ -183,7 +183,7 @@ version: "2"
 roots:
   - ~/dev/src
 catalog:
-  path: ~/.config/fget/catalog.yaml
+  path: ~/.config/fget/fget.catalog.yaml
   imports:
     - /Volumes/samsung_T9/dev
     - /Volumes/work_t7/dev
@@ -232,7 +232,7 @@ cd ~/dev/wtopic___/fs___
 fget link sync
 ```
 
-`config init` creates or updates `fget.yaml`; `catalog sync` creates or refreshes the active scope's owned `catalog.yaml`.
+`config init` creates or updates `fget.yaml`; `catalog sync` creates or refreshes the active scope's owned `fget.catalog.yaml`.
 
 Projection directories can reuse the same `fget.yaml` format, or you can generate/update the
 `link:` block with `fget link init <tag...>`:

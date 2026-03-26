@@ -4,7 +4,7 @@ const (
 	ConfigVersionV1  = "1"
 	ConfigVersionV2  = "2"
 	configFilename   = "fget.yaml"
-	catalogFilename  = "catalog.yaml"
+	catalogFilename  = "fget.catalog.yaml"
 	configDirname    = "fget"
 	defaultConfigDir = ".config"
 )

@@ -21,8 +21,8 @@ func TestLoadCatalogSetForEffectiveConfig_LoadsImportedCatalogs(t *testing.T) {
 		t.Fatalf("mkdirAll() error = %v", err)
 	}
 
-	ownedCatalogPath := filepath.Join(scopeDir, "catalog.yaml")
-	importedCatalogPath := filepath.Join(importedScopeDir, "catalog.yaml")
+	ownedCatalogPath := filepath.Join(scopeDir, "fget.catalog.yaml")
+	importedCatalogPath := filepath.Join(importedScopeDir, "fget.catalog.yaml")
 	importedConfigPath := filepath.Join(importedScopeDir, "fget.yaml")
 
 	now := time.Now().UTC()
@@ -65,7 +65,7 @@ func TestLoadCatalogSetForEffectiveConfig_LoadsImportedCatalogs(t *testing.T) {
 	importedConfig := "" +
 		"version: \"2\"\n" +
 		"catalog:\n" +
-		"  path: ./catalog.yaml\n"
+		"  path: ./fget.catalog.yaml\n"
 	if err := writeFile(importedConfigPath, importedConfig); err != nil {
 		t.Fatalf("writeFile(importedConfigPath) error = %v", err)
 	}

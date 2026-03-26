@@ -56,7 +56,7 @@ func TestDiscoverConfigFiles_OutsideHomeStillDiscovers(t *testing.T) {
 	rootConfig := filepath.Join(workspaceRoot, "fget.yaml")
 	projectConfig := filepath.Join(workspaceRoot, "proj", "fget.yaml")
 
-	if err := os.WriteFile(rootConfig, []byte("version: \"2\"\ncatalog:\n  path: ./catalog.yaml\n"), 0o644); err != nil {
+	if err := os.WriteFile(rootConfig, []byte("version: \"2\"\ncatalog:\n  path: ./fget.catalog.yaml\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile(rootConfig) error = %v", err)
 	}
 	if err := os.WriteFile(projectConfig, []byte("version: \"2\"\n"), 0o644); err != nil {
@@ -98,13 +98,13 @@ func TestResolveDefaultCatalogPath(t *testing.T) {
 	const home = "/Users/test"
 
 	got := ResolveDefaultCatalogPath("", home)
-	want := filepath.Join(home, ".config", "fget", "catalog.yaml")
+	want := filepath.Join(home, ".config", "fget", "fget.catalog.yaml")
 	if got != want {
 		t.Fatalf("ResolveDefaultCatalogPath() = %q, want %q", got, want)
 	}
 
 	got = ResolveDefaultCatalogPath("/tmp/xdg", home)
-	want = filepath.Join("/tmp/xdg", "fget", "catalog.yaml")
+	want = filepath.Join("/tmp/xdg", "fget", "fget.catalog.yaml")
 	if got != want {
 		t.Fatalf("ResolveDefaultCatalogPath() with xdg = %q, want %q", got, want)
 	}
