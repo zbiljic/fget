@@ -101,25 +101,8 @@ func runConfigTagAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	dirtyCatalogs := make(map[string]struct{})
-	for _, repoSelector := range req.RepoSelectors {
-		source, err := set.resolveWritableSource(repoSelector)
-		if err != nil {
-			return err
-		}
-		if err := fconfig.AddTags(source.Catalog, repoSelector, req.Tags); err != nil {
-			return err
-		}
-		dirtyCatalogs[source.CatalogPath] = struct{}{}
-	}
-
-	for _, source := range set.Sources {
-		if _, ok := dirtyCatalogs[source.CatalogPath]; !ok {
-			continue
-		}
-		if err := fconfig.SaveCatalog(source.CatalogPath, source.Catalog); err != nil {
-			return err
-		}
+	if err := applyConfigTagMutation(set, req.RepoSelectors, req.Tags, fconfig.AddTags); err != nil {
+		return err
 	}
 
 	if len(req.RepoSelectors) == 1 {
@@ -159,25 +142,8 @@ func runConfigTagRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	dirtyCatalogs := make(map[string]struct{})
-	for _, repoSelector := range req.RepoSelectors {
-		source, err := set.resolveWritableSource(repoSelector)
-		if err != nil {
-			return err
-		}
-		if err := fconfig.RemoveTags(source.Catalog, repoSelector, req.Tags); err != nil {
-			return err
-		}
-		dirtyCatalogs[source.CatalogPath] = struct{}{}
-	}
-
-	for _, source := range set.Sources {
-		if _, ok := dirtyCatalogs[source.CatalogPath]; !ok {
-			continue
-		}
-		if err := fconfig.SaveCatalog(source.CatalogPath, source.Catalog); err != nil {
-			return err
-		}
+	if err := applyConfigTagMutation(set, req.RepoSelectors, req.Tags, fconfig.RemoveTags); err != nil {
+		return err
 	}
 
 	if len(req.RepoSelectors) == 1 {
@@ -457,4 +423,49 @@ func configTagModifyConfirmText(action string, req configTagModifyRequest) strin
 	b.WriteString("continue?")
 
 	return b.String()
+}
+
+func applyConfigTagMutation(
+	set *catalogSet,
+	repoSelectors []string,
+	tags []string,
+	mutate func(*fconfig.Catalog, string, []string) error,
+) error {
+	if set == nil {
+		return errors.New("nil catalog set")
+	}
+	if set.View == nil {
+		return errors.New("nil catalog")
+	}
+
+	dirtyCatalogs := make(map[string]struct{})
+	for _, repoSelector := range repoSelectors {
+		repoID, err := resolveCatalogRepoSelector(set.View, repoSelector)
+		if err != nil {
+			return err
+		}
+
+		sources, err := set.resolveTagSources(repoID)
+		if err != nil {
+			return err
+		}
+
+		for _, source := range sources {
+			if err := mutate(source.Catalog, repoID, tags); err != nil {
+				return err
+			}
+			dirtyCatalogs[source.CatalogPath] = struct{}{}
+		}
+	}
+
+	for i := range set.Sources {
+		if _, ok := dirtyCatalogs[set.Sources[i].CatalogPath]; !ok {
+			continue
+		}
+		if err := fconfig.SaveCatalog(set.Sources[i].CatalogPath, set.Sources[i].Catalog); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

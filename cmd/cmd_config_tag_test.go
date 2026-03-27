@@ -3,9 +3,11 @@ package cmd
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zbiljic/fget/pkg/fconfig"
 )
@@ -426,5 +428,86 @@ func TestConfigTagModifyConfirmText_ListsRepositories(t *testing.T) {
 	}
 	if !strings.Contains(got, "continue?") {
 		t.Fatalf("configTagModifyConfirmText() = %q, want continue text", got)
+	}
+}
+
+func TestApplyConfigTagMutation_UpdatesAllCatalogsForSharedRepo(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	localRepoPath := filepath.Join(baseDir, "local", "api")
+	remoteRepoPath := filepath.Join(baseDir, "remote", "api")
+	if err := mkdirAll(localRepoPath, remoteRepoPath); err != nil {
+		t.Fatalf("mkdirAll() error = %v", err)
+	}
+
+	localCatalogPath := filepath.Join(baseDir, "local.catalog.yaml")
+	remoteCatalogPath := filepath.Join(baseDir, "remote.catalog.yaml")
+
+	now := time.Now().UTC()
+	localCatalog := &fconfig.Catalog{
+		Version: fconfig.CatalogVersionV1,
+		Repos: []fconfig.RepoEntry{
+			{
+				ID:   "github.com/acme/api",
+				Tags: []string{"local"},
+				Locations: []fconfig.RepoLocation{
+					{Path: localRepoPath, LastSeenAt: now},
+				},
+			},
+		},
+	}
+	remoteCatalog := &fconfig.Catalog{
+		Version: fconfig.CatalogVersionV1,
+		Repos: []fconfig.RepoEntry{
+			{
+				ID:   "github.com/acme/api",
+				Tags: []string{"remote"},
+				Locations: []fconfig.RepoLocation{
+					{Path: remoteRepoPath, LastSeenAt: now},
+				},
+			},
+		},
+	}
+
+	if err := fconfig.SaveCatalog(localCatalogPath, localCatalog); err != nil {
+		t.Fatalf("SaveCatalog(local) error = %v", err)
+	}
+	if err := fconfig.SaveCatalog(remoteCatalogPath, remoteCatalog); err != nil {
+		t.Fatalf("SaveCatalog(remote) error = %v", err)
+	}
+
+	set := &catalogSet{
+		Sources: []catalogSource{
+			{
+				CatalogPath: localCatalogPath,
+				Catalog:     localCatalog,
+			},
+			{
+				CatalogPath: remoteCatalogPath,
+				Catalog:     remoteCatalog,
+			},
+		},
+		View: fconfig.MergeCatalogs(localCatalog, remoteCatalog),
+	}
+
+	if err := applyConfigTagMutation(set, []string{localRepoPath}, []string{"shared"}, fconfig.AddTags); err != nil {
+		t.Fatalf("applyConfigTagMutation() error = %v", err)
+	}
+
+	reloadedLocal, err := fconfig.LoadCatalog(localCatalogPath)
+	if err != nil {
+		t.Fatalf("LoadCatalog(local) error = %v", err)
+	}
+	reloadedRemote, err := fconfig.LoadCatalog(remoteCatalogPath)
+	if err != nil {
+		t.Fatalf("LoadCatalog(remote) error = %v", err)
+	}
+
+	if !reflect.DeepEqual(reloadedLocal.Repos[0].Tags, []string{"local", "shared"}) {
+		t.Fatalf("local tags = %v, want %v", reloadedLocal.Repos[0].Tags, []string{"local", "shared"})
+	}
+	if !reflect.DeepEqual(reloadedRemote.Repos[0].Tags, []string{"remote", "shared"}) {
+		t.Fatalf("remote tags = %v, want %v", reloadedRemote.Repos[0].Tags, []string{"remote", "shared"})
 	}
 }

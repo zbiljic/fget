@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -69,6 +70,7 @@ func runConfigSync(cmd *cobra.Command, args []string) error {
 		configSyncCmdFlags.Roots,
 		argRoots,
 		config.Roots,
+		config.Catalog.Imports,
 		runtimeCtx.Cwd,
 		runtimeCtx.HomeDir,
 		normalizeConfigRoots,
@@ -173,6 +175,7 @@ func resolveSyncRoots(
 	flagRoots []string,
 	argRoots []string,
 	configRoots []string,
+	configImports []string,
 	cwd string,
 	homeDir string,
 	normalize normalizeRootsFn,
@@ -184,6 +187,8 @@ func resolveSyncRoots(
 		return argRoots, nil
 	case len(configRoots) > 0:
 		return normalize(configRoots, homeDir)
+	case len(configImports) > 0:
+		return nil, errors.New("catalog sync requires explicit local roots when catalog imports are configured")
 	default:
 		return []string{cwd}, nil
 	}

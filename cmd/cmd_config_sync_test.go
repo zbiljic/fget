@@ -29,7 +29,7 @@ func TestResolveSyncRoots_FallbackToCwd(t *testing.T) {
 
 	cwd := t.TempDir()
 
-	got, err := resolveSyncRoots(nil, nil, nil, cwd, "home", func([]string, string) ([]string, error) {
+	got, err := resolveSyncRoots(nil, nil, nil, nil, cwd, "home", func([]string, string) ([]string, error) {
 		t.Fatal("normalize should not be called when no roots are configured")
 		return nil, nil
 	})
@@ -50,7 +50,7 @@ func TestResolveSyncRoots_Precedence(t *testing.T) {
 		return append([]string{}, roots...), nil
 	}
 
-	got, err := resolveSyncRoots([]string{"/flags"}, []string{"/args"}, []string{"/cfg"}, "/cwd", "home", normalize)
+	got, err := resolveSyncRoots([]string{"/flags"}, []string{"/args"}, []string{"/cfg"}, []string{"/imported/fget.yaml"}, "/cwd", "home", normalize)
 	if err != nil {
 		t.Fatalf("resolveSyncRoots() error = %v", err)
 	}
@@ -58,7 +58,7 @@ func TestResolveSyncRoots_Precedence(t *testing.T) {
 		t.Fatalf("flags precedence mismatch: %v", got)
 	}
 
-	got, err = resolveSyncRoots(nil, []string{"/args"}, []string{"/cfg"}, "/cwd", "home", normalize)
+	got, err = resolveSyncRoots(nil, []string{"/args"}, []string{"/cfg"}, []string{"/imported/fget.yaml"}, "/cwd", "home", normalize)
 	if err != nil {
 		t.Fatalf("resolveSyncRoots() error = %v", err)
 	}
@@ -66,7 +66,7 @@ func TestResolveSyncRoots_Precedence(t *testing.T) {
 		t.Fatalf("args precedence mismatch: %v", got)
 	}
 
-	got, err = resolveSyncRoots(nil, nil, []string{"/cfg"}, "/cwd", "home", normalize)
+	got, err = resolveSyncRoots(nil, nil, []string{"/cfg"}, []string{"/imported/fget.yaml"}, "/cwd", "home", normalize)
 	if err != nil {
 		t.Fatalf("resolveSyncRoots() error = %v", err)
 	}
@@ -79,11 +79,26 @@ func TestResolveSyncRoots_PropagatesNormalizeError(t *testing.T) {
 	t.Parallel()
 
 	wantErr := errors.New("boom")
-	_, err := resolveSyncRoots([]string{"x"}, nil, nil, "/cwd", "home", func([]string, string) ([]string, error) {
+	_, err := resolveSyncRoots([]string{"x"}, nil, nil, nil, "/cwd", "home", func([]string, string) ([]string, error) {
 		return nil, wantErr
 	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("resolveSyncRoots() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestResolveSyncRoots_RequiresExplicitRootsWhenImportsConfigured(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolveSyncRoots(nil, nil, nil, []string{"/external/fget.yaml"}, "/home/user", "home", func([]string, string) ([]string, error) {
+		t.Fatal("normalize should not be called when no local roots are configured")
+		return nil, nil
+	})
+	if err == nil {
+		t.Fatal("resolveSyncRoots() error = nil, want explicit roots error")
+	}
+	if got := err.Error(); got != "catalog sync requires explicit local roots when catalog imports are configured" {
+		t.Fatalf("resolveSyncRoots() error = %q", got)
 	}
 }
 

@@ -13,7 +13,6 @@ type catalogSource struct {
 	ScopePath   string
 	CatalogPath string
 	Catalog     *fconfig.Catalog
-	Writable    bool
 }
 
 type catalogSet struct {
@@ -50,15 +49,12 @@ func loadCatalogSetForEffectiveConfig(config *fconfig.EffectiveConfig, homeDir s
 	}
 
 	set := &catalogSet{}
-	seenCatalogs := make(map[string]int)
+	seenCatalogs := make(map[string]struct{})
 	seenScopes := make(map[string]struct{})
 
-	addCatalog := func(scopePath, catalogPath string, writable bool) error {
+	addCatalog := func(scopePath, catalogPath string) error {
 		catalogPath = filepath.Clean(catalogPath)
-		if index, ok := seenCatalogs[catalogPath]; ok {
-			if writable {
-				set.Sources[index].Writable = true
-			}
+		if _, ok := seenCatalogs[catalogPath]; ok {
 			return nil
 		}
 
@@ -76,9 +72,8 @@ func loadCatalogSetForEffectiveConfig(config *fconfig.EffectiveConfig, homeDir s
 			ScopePath:   scopePath,
 			CatalogPath: catalogPath,
 			Catalog:     catalog,
-			Writable:    writable,
 		})
-		seenCatalogs[catalogPath] = len(set.Sources) - 1
+		seenCatalogs[catalogPath] = struct{}{}
 
 		return nil
 	}
@@ -99,7 +94,7 @@ func loadCatalogSetForEffectiveConfig(config *fconfig.EffectiveConfig, homeDir s
 			return fmt.Errorf("imported config %s does not define catalog.path", scopePath)
 		}
 
-		if err := addCatalog(scopePath, cfg.Catalog.Path, false); err != nil {
+		if err := addCatalog(scopePath, cfg.Catalog.Path); err != nil {
 			return err
 		}
 		for _, importPath := range cfg.Catalog.Imports {
@@ -111,7 +106,7 @@ func loadCatalogSetForEffectiveConfig(config *fconfig.EffectiveConfig, homeDir s
 		return nil
 	}
 
-	if err := addCatalog(config.ScopeOwner, config.Catalog.Path, true); err != nil {
+	if err := addCatalog(config.ScopeOwner, config.Catalog.Path); err != nil {
 		return nil, err
 	}
 	if config.ScopeOwner != "" {
@@ -143,34 +138,23 @@ func loadExistingCatalog(path, scopeRoot string) (*fconfig.Catalog, error) {
 	return fconfig.LoadCatalogWithScope(path, scopeRoot)
 }
 
-func (set *catalogSet) resolveWritableSource(selector string) (*catalogSource, error) {
+func (set *catalogSet) resolveTagSources(repoID string) ([]*catalogSource, error) {
 	if set == nil {
 		return nil, errors.New("nil catalog set")
 	}
 
-	matches := make([]int, 0, len(set.Sources))
-	writableMatches := make([]int, 0, len(set.Sources))
+	matches := make([]*catalogSource, 0, len(set.Sources))
 	for i := range set.Sources {
-		if _, err := fconfig.ResolveRepoIndex(set.Sources[i].Catalog, selector); err != nil {
+		if _, err := fconfig.ResolveRepoIndex(set.Sources[i].Catalog, repoID); err != nil {
 			continue
 		}
 
-		matches = append(matches, i)
-		if set.Sources[i].Writable {
-			writableMatches = append(writableMatches, i)
-		}
+		matches = append(matches, &set.Sources[i])
 	}
 
-	switch {
-	case len(writableMatches) == 1:
-		return &set.Sources[writableMatches[0]], nil
-	case len(writableMatches) > 1:
-		return nil, fmt.Errorf("repository %q is ambiguous across writable catalogs", selector)
-	case len(matches) == 1:
-		return &set.Sources[matches[0]], nil
-	case len(matches) > 1:
-		return nil, fmt.Errorf("repository %q is ambiguous across imported catalogs", selector)
-	default:
-		return nil, fmt.Errorf("repository %q not found in catalog", selector)
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("repository %q not found in catalog", repoID)
 	}
+
+	return matches, nil
 }

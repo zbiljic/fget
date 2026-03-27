@@ -101,23 +101,29 @@ func TestLoadCatalogSetForEffectiveConfig_LoadsImportedCatalogs(t *testing.T) {
 		t.Fatalf("merged locations = %d, want 2", len(repo.Locations))
 	}
 
-	source, err := set.resolveWritableSource("github.com/acme/api")
+	sources, err := set.resolveTagSources("github.com/acme/api")
 	if err != nil {
-		t.Fatalf("resolveWritableSource() error = %v", err)
+		t.Fatalf("resolveTagSources() error = %v", err)
 	}
-	if !source.Writable {
-		t.Fatal("resolveWritableSource() returned non-writable source")
+	if len(sources) != 2 {
+		t.Fatalf("source count for shared repo = %d, want 2", len(sources))
 	}
-	if source.CatalogPath != ownedCatalogPath {
-		t.Fatalf("writable catalog path = %q, want %q", source.CatalogPath, ownedCatalogPath)
+	if sources[0].CatalogPath != ownedCatalogPath {
+		t.Fatalf("first shared source path = %q, want %q", sources[0].CatalogPath, ownedCatalogPath)
+	}
+	if sources[1].CatalogPath != importedCatalogPath {
+		t.Fatalf("second shared source path = %q, want %q", sources[1].CatalogPath, importedCatalogPath)
 	}
 
-	source, err = set.resolveWritableSource("github.com/acme/worker")
+	sources, err = set.resolveTagSources("github.com/acme/worker")
 	if err != nil {
-		t.Fatalf("resolveWritableSource(imported) error = %v", err)
+		t.Fatalf("resolveTagSources(imported) error = %v", err)
 	}
-	if source.CatalogPath != importedCatalogPath {
-		t.Fatalf("imported catalog path = %q, want %q", source.CatalogPath, importedCatalogPath)
+	if len(sources) != 1 {
+		t.Fatalf("source count for imported repo = %d, want 1", len(sources))
+	}
+	if sources[0].CatalogPath != importedCatalogPath {
+		t.Fatalf("imported catalog path = %q, want %q", sources[0].CatalogPath, importedCatalogPath)
 	}
 }
 
