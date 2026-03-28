@@ -109,3 +109,13 @@ func TestResolveDefaultCatalogPath(t *testing.T) {
 		t.Fatalf("ResolveDefaultCatalogPath() with xdg = %q, want %q", got, want)
 	}
 }
+
+func TestResolveScopedCatalogPath(t *testing.T) {
+	t.Parallel()
+
+	got := ResolveScopedCatalogPath()
+	want := "./fget.catalog.yaml"
+	if got != want {
+		t.Fatalf("ResolveScopedCatalogPath() = %q, want %q", got, want)
+	}
+}

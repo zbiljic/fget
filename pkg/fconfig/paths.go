@@ -46,6 +46,10 @@ func ResolveDefaultCatalogPath(xdgConfigHome, homeDir string) string {
 	return filepath.Join(homeDir, defaultConfigDir, configDirname, catalogFilename)
 }
 
+func ResolveScopedCatalogPath() string {
+	return "./" + catalogFilename
+}
+
 func reverse(values []string) {
 	for i, j := 0, len(values)-1; i < j; i, j = i+1, j-1 {
 		values[i], values[j] = values[j], values[i]
