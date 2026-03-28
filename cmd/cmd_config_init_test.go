@@ -131,7 +131,7 @@ func TestApplyInitConfig_CreateWhenMissing(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "fget.yaml")
 	roots := []string{"/tmp/b", "/tmp/a"}
 
-	config, err := applyInitConfig(target, roots, false)
+	config, err := applyInitConfig(target, roots, false, false)
 	if err != nil {
 		t.Fatalf("applyInitConfig() error = %v", err)
 	}
@@ -167,7 +167,7 @@ func TestApplyInitConfig_MergeExistingRootsAndPreserveCatalogPath(t *testing.T) 
 		t.Fatalf("SaveConfig(initial) error = %v", err)
 	}
 
-	config, err := applyInitConfig(target, []string{"/b", "/a"}, false)
+	config, err := applyInitConfig(target, []string{"/b", "/a"}, false, false)
 	if err != nil {
 		t.Fatalf("applyInitConfig() error = %v", err)
 	}
@@ -194,7 +194,7 @@ func TestApplyInitConfig_ForceOverwrite(t *testing.T) {
 		t.Fatalf("SaveConfig(initial) error = %v", err)
 	}
 
-	config, err := applyInitConfig(target, []string{"/new"}, true)
+	config, err := applyInitConfig(target, []string{"/new"}, true, false)
 	if err != nil {
 		t.Fatalf("applyInitConfig() error = %v", err)
 	}
@@ -207,9 +207,42 @@ func TestApplyInitConfig_ForceOverwrite(t *testing.T) {
 	}
 }
 
-func TestRunConfigInit_LocalCreatesConfigFile(t *testing.T) {
+func TestApplyInitConfig_WithCatalogCreatesSiblingCatalogPath(t *testing.T) {
 	t.Parallel()
 
+	target := filepath.Join(t.TempDir(), "fget.yaml")
+
+	initial := &fconfig.Config{
+		Version: fconfig.ConfigVersionV1,
+		Roots:   []string{"/old"},
+		Catalog: fconfig.CatalogConfig{
+			Imports: []string{"/external/fget.yaml"},
+		},
+	}
+	if err := vconfig.SaveConfig(initial, target); err != nil {
+		t.Fatalf("SaveConfig(initial) error = %v", err)
+	}
+
+	config, err := applyInitConfig(target, []string{"/new"}, false, true)
+	if err != nil {
+		t.Fatalf("applyInitConfig() error = %v", err)
+	}
+
+	if config.Version != fconfig.ConfigVersionV2 {
+		t.Fatalf("version = %q, want %q", config.Version, fconfig.ConfigVersionV2)
+	}
+	if !equalStringSlices(config.Roots, []string{"/new", "/old"}) {
+		t.Fatalf("roots = %v, want %v", config.Roots, []string{"/new", "/old"})
+	}
+	if config.Catalog.Path != fconfig.ResolveScopedCatalogPath() {
+		t.Fatalf("catalog.path = %q, want %q", config.Catalog.Path, fconfig.ResolveScopedCatalogPath())
+	}
+	if !equalStringSlices(config.Catalog.Imports, []string{"/external/fget.yaml"}) {
+		t.Fatalf("catalog.imports = %v, want %v", config.Catalog.Imports, []string{"/external/fget.yaml"})
+	}
+}
+
+func TestRunConfigInit_LocalCreatesConfigFile(t *testing.T) {
 	tmp := t.TempDir()
 	originalWd, err := os.Getwd()
 	if err != nil {
@@ -221,6 +254,10 @@ func TestRunConfigInit_LocalCreatesConfigFile(t *testing.T) {
 
 	if err := os.Chdir(tmp); err != nil {
 		t.Fatalf("Chdir(tmp) error = %v", err)
+	}
+	expectedRoot, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
 	}
 
 	originalFlags := configInitCmdFlags
@@ -240,11 +277,47 @@ func TestRunConfigInit_LocalCreatesConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
-	expectedRoot, err := os.Getwd()
+	if !equalStringSlices(config.Roots, []string{expectedRoot}) {
+		t.Fatalf("roots = %v, want %v", config.Roots, []string{expectedRoot})
+	}
+}
+
+func TestRunConfigInit_LocalWithCatalogCreatesScopedConfigFile(t *testing.T) {
+	tmp := t.TempDir()
+	originalWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() error = %v", err)
 	}
-	if !equalStringSlices(config.Roots, []string{expectedRoot}) {
-		t.Fatalf("roots = %v, want %v", config.Roots, []string{expectedRoot})
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
+
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("Chdir(tmp) error = %v", err)
+	}
+
+	originalFlags := configInitCmdFlags
+	configInitCmdFlags = configInitOptions{
+		Local:   true,
+		Catalog: true,
+	}
+	defer func() {
+		configInitCmdFlags = originalFlags
+	}()
+
+	if err := runConfigInit(nil, nil); err != nil {
+		t.Fatalf("runConfigInit() error = %v", err)
+	}
+
+	target := filepath.Join(tmp, "fget.yaml")
+	config, err := vconfig.LoadConfig[fconfig.Config](target)
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	if config.Version != fconfig.ConfigVersionV2 {
+		t.Fatalf("version = %q, want %q", config.Version, fconfig.ConfigVersionV2)
+	}
+	if config.Catalog.Path != fconfig.ResolveScopedCatalogPath() {
+		t.Fatalf("catalog.path = %q, want %q", config.Catalog.Path, fconfig.ResolveScopedCatalogPath())
 	}
 }

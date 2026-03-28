@@ -201,6 +201,9 @@ fget config init --root ~/dev --root ~/work
 # Write local config in current directory
 fget config init --local
 
+# Write local config in current directory and scope it to ./fget.catalog.yaml
+fget config init --local --catalog
+
 # Write explicit config file (overwrites with minimal config when --force is set)
 fget config init --file ~/tmp/fget.yaml --force
 

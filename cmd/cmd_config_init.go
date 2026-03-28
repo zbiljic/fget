@@ -16,6 +16,8 @@ import (
 	"github.com/zbiljic/fget/pkg/vconfig"
 )
 
+const fconfigFilename = "fget.yaml"
+
 var configInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Create or update fget.yaml configuration",
@@ -24,10 +26,11 @@ var configInitCmd = &cobra.Command{
 }
 
 type configInitOptions struct {
-	Roots []string
-	Force bool
-	Local bool
-	File  string
+	Roots   []string
+	Force   bool
+	Local   bool
+	File    string
+	Catalog bool
 }
 
 var configInitCmdFlags = configInitOptions{}
@@ -39,6 +42,7 @@ func init() {
 	configInitCmd.Flags().BoolVar(&configInitCmdFlags.Force, "force", false, "Overwrite existing configuration with minimal config")
 	configInitCmd.Flags().BoolVar(&configInitCmdFlags.Local, "local", false, "Write config to ./fget.yaml")
 	configInitCmd.Flags().StringVar(&configInitCmdFlags.File, "file", "", "Explicit config file path")
+	configInitCmd.Flags().BoolVar(&configInitCmdFlags.Catalog, "catalog", false, "Set catalog.path to a sibling ./fget.catalog.yaml")
 
 	configCmd.AddCommand(configInitCmd)
 }
@@ -65,13 +69,16 @@ func runConfigInit(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	config, err := applyInitConfig(targetPath, roots, configInitCmdFlags.Force)
+	config, err := applyInitConfig(targetPath, roots, configInitCmdFlags.Force, configInitCmdFlags.Catalog)
 	if err != nil {
 		return err
 	}
 
 	ptermSuccessMessageStyle.Printfln("config initialized: %s", targetPath)
 	pterm.Printf("roots: %s\n", strings.Join(config.Roots, ", "))
+	if config.Catalog.Path != "" {
+		pterm.Printf("catalog: %s\n", config.Catalog.Path)
+	}
 	pterm.Println("next: fget catalog sync")
 
 	return nil
@@ -126,7 +133,7 @@ func resolveInitRoots(flagRoots []string, cwd, homeDir string) ([]string, error)
 	return normalizedRoots, nil
 }
 
-func applyInitConfig(target string, roots []string, force bool) (*fconfig.Config, error) {
+func applyInitConfig(target string, roots []string, force, withCatalog bool) (*fconfig.Config, error) {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return nil, err
 	}
@@ -149,6 +156,11 @@ func applyInitConfig(target string, roots []string, force bool) (*fconfig.Config
 		}
 		config.Catalog = existing.Catalog
 		config.Roots = sortedUnique(append(existing.Roots, roots...))
+	}
+
+	if withCatalog {
+		config.Version = fconfig.ConfigVersionV2
+		config.Catalog.Path = fconfig.ResolveScopedCatalogPath()
 	}
 
 	if err := vconfig.SaveConfig(config, target); err != nil {
@@ -182,5 +194,3 @@ func fileExists(path string) bool {
 
 	return !info.IsDir()
 }
-
-const fconfigFilename = "fget.yaml"
