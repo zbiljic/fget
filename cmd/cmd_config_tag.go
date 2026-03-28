@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -240,7 +241,7 @@ func resolveConfigTagModifyRequest(
 	}
 
 	if len(args) >= 2 {
-		repoSelector, matched, err := resolveExplicitCatalogRepoSelector(catalog, args[0])
+		repoSelector, matched, err := resolveConfigTagRepoSelectorArg(catalog, args[0])
 		if err != nil {
 			return configTagModifyRequest{}, err
 		}
@@ -283,6 +284,21 @@ func resolveConfigTagModifyRequest(
 	}, nil
 }
 
+func resolveConfigTagRepoSelectorArg(catalog *fconfig.Catalog, selector string) (string, bool, error) {
+	repoSelector, matched, err := resolveExplicitCatalogRepoSelector(catalog, selector)
+	if err != nil {
+		return "", false, err
+	}
+	if matched {
+		return repoSelector, true, nil
+	}
+	if !looksLikeConfigTagRepoSelector(selector) {
+		return "", false, nil
+	}
+
+	return "", false, fmt.Errorf("repository %q not found in catalog", selector)
+}
+
 func resolveExplicitCatalogRepoSelector(catalog *fconfig.Catalog, selector string) (string, bool, error) {
 	if index, err := fconfig.ResolveRepoIndex(catalog, selector); err == nil {
 		return catalog.Repos[index].ID, true, nil
@@ -303,6 +319,48 @@ func resolveExplicitCatalogRepoSelector(catalog *fconfig.Catalog, selector strin
 	}
 
 	return catalog.Repos[index].ID, true, nil
+}
+
+func looksLikeConfigTagRepoSelector(value string) bool {
+	switch {
+	case value == "":
+		return false
+	case looksLikeRemoteRepoURL(value):
+		return true
+	case filepath.IsAbs(value):
+		return true
+	case value == "." || value == "..":
+		return true
+	case strings.HasPrefix(value, "."+string(filepath.Separator)):
+		return true
+	case strings.HasPrefix(value, ".."+string(filepath.Separator)):
+		return true
+	default:
+		return looksLikeRepoProjectID(value)
+	}
+}
+
+func looksLikeRepoProjectID(value string) bool {
+	trimmed := strings.Trim(value, "/")
+	if trimmed == "" {
+		return false
+	}
+
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 3 {
+		return false
+	}
+	if !strings.Contains(parts[0], ".") {
+		return false
+	}
+
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+
+	return true
 }
 
 func validateConfigTagValues(tags []string) error {

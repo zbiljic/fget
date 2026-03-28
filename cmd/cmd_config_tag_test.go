@@ -135,6 +135,86 @@ func TestResolveConfigTagModifyRequest_ExplicitRepoSelector(t *testing.T) {
 	}
 }
 
+func TestResolveConfigTagModifyRequest_RejectsMissingExplicitRepoSelector(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "github.com/acme/api",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/api"},
+				},
+			},
+		},
+	}
+
+	_, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"github.com/acme/missing", "alpha"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			t.Fatal("gitRoot should not be called when explicit repo selector is provided")
+			return "", nil
+		},
+		func(context.Context, ...string) ([]string, error) {
+			t.Fatal("findRepos should not be called when explicit repo selector is provided")
+			return nil, nil
+		},
+		func(string) (fconfig.RepoMetadata, error) {
+			t.Fatal("inspectRepo should not be called when explicit repo selector is provided")
+			return fconfig.RepoMetadata{}, nil
+		},
+	)
+	if err == nil {
+		t.Fatal("resolveConfigTagModifyRequest() expected error")
+	}
+	if !strings.Contains(err.Error(), `repository "github.com/acme/missing" not found in catalog`) {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %q, want missing repository error", err)
+	}
+}
+
+func TestResolveConfigTagModifyRequest_RejectsMissingExplicitRepoPathSelector(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "github.com/acme/api",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/api"},
+				},
+			},
+		},
+	}
+
+	_, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"/workspace/missing", "alpha"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			t.Fatal("gitRoot should not be called when explicit repo selector is provided")
+			return "", nil
+		},
+		func(context.Context, ...string) ([]string, error) {
+			t.Fatal("findRepos should not be called when explicit repo selector is provided")
+			return nil, nil
+		},
+		func(string) (fconfig.RepoMetadata, error) {
+			t.Fatal("inspectRepo should not be called when explicit repo selector is provided")
+			return fconfig.RepoMetadata{}, nil
+		},
+	)
+	if err == nil {
+		t.Fatal("resolveConfigTagModifyRequest() expected error")
+	}
+	if !strings.Contains(err.Error(), `repository "/workspace/missing" not found in catalog`) {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %q, want missing repository error", err)
+	}
+}
+
 func TestResolveConfigTagModifyRequest_NormalizesExplicitRepoURLSelector(t *testing.T) {
 	t.Parallel()
 
