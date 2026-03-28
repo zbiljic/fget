@@ -266,6 +266,57 @@ func TestResolveConfigTagModifyRequest_NormalizesExplicitRepoURLSelector(t *test
 	}
 }
 
+func TestResolveConfigTagModifyRequest_NormalizesExplicitHTTPSRepoSelector(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Repos: []fconfig.RepoEntry{
+			{
+				ID: "github.com/acme/discovery",
+				Locations: []fconfig.RepoLocation{
+					{Path: "/workspace/discovery"},
+				},
+			},
+		},
+	}
+
+	req, err := resolveConfigTagModifyRequest(
+		context.Background(),
+		[]string{"https://github.com/acme/discovery", "w:turain"},
+		"/workspace",
+		catalog,
+		func(string) (string, error) {
+			t.Fatal("gitRoot should not be called when explicit repo selector is provided")
+			return "", nil
+		},
+		func(context.Context, ...string) ([]string, error) {
+			t.Fatal("findRepos should not be called when explicit repo selector is provided")
+			return nil, nil
+		},
+		func(string) (fconfig.RepoMetadata, error) {
+			t.Fatal("inspectRepo should not be called when explicit repo selector is provided")
+			return fconfig.RepoMetadata{}, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveConfigTagModifyRequest() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(req.RepoSelectors, []string{"github.com/acme/discovery"}) {
+		t.Fatalf(
+			"resolveConfigTagModifyRequest() selectors = %v, want %v",
+			req.RepoSelectors,
+			[]string{"github.com/acme/discovery"},
+		)
+	}
+	if !reflect.DeepEqual(req.Tags, []string{"w:turain"}) {
+		t.Fatalf("resolveConfigTagModifyRequest() tags = %v, want %v", req.Tags, []string{"w:turain"})
+	}
+	if req.RequiresConfirmation {
+		t.Fatal("resolveConfigTagModifyRequest() RequiresConfirmation = true, want false")
+	}
+}
+
 func TestResolveConfigTagModifyRequest_RejectsURLTag(t *testing.T) {
 	t.Parallel()
 
