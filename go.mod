@@ -18,7 +18,7 @@ require (
 	github.com/samber/lo v1.53.0
 	github.com/spf13/cobra v1.10.2
 	github.com/tevino/abool/v2 v2.1.0
-	github.com/thediveo/enumflag/v2 v2.1.0
+	github.com/thediveo/enumflag/v2 v2.2.0
 	github.com/whilp/git-urls v1.0.0
 	github.com/zbiljic/gitexec v0.0.0-20260326095630-6fa5b24b7b9b
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90
@@ -51,8 +51,8 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/crypto v0.47.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
