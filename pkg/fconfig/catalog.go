@@ -202,6 +202,10 @@ func MergeCatalogs(catalogs ...*Catalog) *Catalog {
 		}
 	}
 
+	sort.Slice(merged.Repos, func(i, j int) bool {
+		return merged.Repos[i].ID < merged.Repos[j].ID
+	})
+
 	return merged
 }
 
@@ -451,7 +455,4 @@ func mergeCatalogRepo(catalog *Catalog, repoIndex map[string]int, repo RepoEntry
 
 	catalog.Repos = append(catalog.Repos, normalizeRepoEntry(repo))
 	repoIndex[repo.ID] = len(catalog.Repos) - 1
-	sort.Slice(catalog.Repos, func(i, j int) bool {
-		return catalog.Repos[i].ID < catalog.Repos[j].ID
-	})
 }

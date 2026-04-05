@@ -195,6 +195,78 @@ func TestLoadCatalogWithScope_RewritesRelativePathsAgainstCurrentScopeRoot(t *te
 	}
 }
 
+func TestMergeCatalogs_PreservesRepoIndexAcrossOutOfOrderAppends(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	sharedRepoID := "example.com/team/shared"
+
+	base := &Catalog{
+		Version: CatalogVersionV1,
+		Repos: []RepoEntry{
+			{
+				ID:   sharedRepoID,
+				Tags: []string{"local"},
+				Locations: []RepoLocation{
+					{
+						Path:       "/repos/local/shared",
+						LastSeenAt: now,
+					},
+				},
+			},
+		},
+	}
+
+	imported := &Catalog{
+		Version: CatalogVersionV1,
+		Repos: []RepoEntry{
+			{
+				ID:   "github.com/example/aaa",
+				Tags: []string{"external"},
+				Locations: []RepoLocation{
+					{
+						Path:       "/repos/external/aaa",
+						LastSeenAt: now,
+					},
+				},
+			},
+			{
+				ID:   sharedRepoID,
+				Tags: []string{"w:zucli"},
+				Locations: []RepoLocation{
+					{
+						Path:       "/repos/external/shared",
+						LastSeenAt: now.Add(time.Minute),
+					},
+				},
+			},
+		},
+	}
+
+	merged := MergeCatalogs(base, imported)
+
+	index, err := ResolveRepoIndex(merged, sharedRepoID)
+	if err != nil {
+		t.Fatalf("ResolveRepoIndex() error = %v", err)
+	}
+
+	repo := merged.Repos[index]
+	if !reflect.DeepEqual(repo.Tags, []string{"local", "w:zucli"}) {
+		t.Fatalf("merged tags = %v, want %v", repo.Tags, []string{"local", "w:zucli"})
+	}
+	if len(repo.Locations) != 2 {
+		t.Fatalf("merged locations = %d, want 2", len(repo.Locations))
+	}
+
+	otherIndex, err := ResolveRepoIndex(merged, "github.com/example/aaa")
+	if err != nil {
+		t.Fatalf("ResolveRepoIndex(other) error = %v", err)
+	}
+	if !reflect.DeepEqual(merged.Repos[otherIndex].Tags, []string{"external"}) {
+		t.Fatalf("other repo tags = %v, want %v", merged.Repos[otherIndex].Tags, []string{"external"})
+	}
+}
+
 func TestLoadCatalog_RejectsUnsupportedVersion(t *testing.T) {
 	t.Parallel()
 
