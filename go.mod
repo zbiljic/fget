@@ -12,7 +12,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.8.0
 	github.com/go-git/go-git/v5 v5.17.2
 	github.com/hashicorp/go-retryablehttp v0.7.8
-	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-isatty v0.0.21
 	github.com/plar/go-adaptive-radix-tree/v2 v2.0.4
 	github.com/pterm/pterm v0.12.83
 	github.com/samber/lo v1.53.0
