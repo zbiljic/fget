@@ -54,6 +54,210 @@ func TestCatalogUpsert_PreservesExistingTagsAndLocations(t *testing.T) {
 	}
 }
 
+func TestCatalogApplyRepoMove_PreservesTagsAndRewritesLocation(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	catalog := &Catalog{
+		Version: CatalogVersionV1,
+		Repos: []RepoEntry{
+			{
+				ID:        "github.com/old-owner/models",
+				RemoteURL: "https://github.com/old-owner/models",
+				Tags:      []string{"w:zucli"},
+				Locations: []RepoLocation{
+					{Path: "/repos/github.com/old-owner/models", LastSeenAt: now.Add(-time.Hour)},
+				},
+			},
+		},
+	}
+
+	changed := catalog.ApplyRepoMove(RepoMove{
+		OldID:   "github.com/old-owner/models",
+		NewID:   "github.com/new-owner/models",
+		OldURL:  "https://github.com/old-owner/models",
+		NewURL:  "https://github.com/new-owner/models",
+		OldPath: "/repos/github.com/old-owner/models",
+		NewPath: "/repos/github.com/new-owner/models",
+		MovedAt: now,
+	})
+	if !changed {
+		t.Fatal("ApplyRepoMove() changed = false, want true")
+	}
+	if len(catalog.Repos) != 1 {
+		t.Fatalf("catalog repo count = %d, want 1", len(catalog.Repos))
+	}
+
+	repo := catalog.Repos[0]
+	if repo.ID != "github.com/new-owner/models" {
+		t.Fatalf("repo id = %q, want new id", repo.ID)
+	}
+	if repo.RemoteURL != "https://github.com/new-owner/models" {
+		t.Fatalf("repo remote_url = %q, want new URL", repo.RemoteURL)
+	}
+	if !reflect.DeepEqual(repo.Tags, []string{"w:zucli"}) {
+		t.Fatalf("repo tags = %v, want preserved tag", repo.Tags)
+	}
+	if len(repo.Locations) != 1 || repo.Locations[0].Path != "/repos/github.com/new-owner/models" {
+		t.Fatalf("repo locations = %#v, want rewritten location", repo.Locations)
+	}
+	if !repo.Locations[0].LastSeenAt.Equal(now) {
+		t.Fatalf("location last_seen_at = %s, want %s", repo.Locations[0].LastSeenAt, now)
+	}
+}
+
+func TestCatalogApplyRepoMove_MergesExistingCanonicalEntryAndOtherLocations(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	catalog := &Catalog{
+		Version: CatalogVersionV1,
+		Repos: []RepoEntry{
+			{
+				ID:        "github.com/old-owner/models",
+				RemoteURL: "https://github.com/old-owner/models",
+				Tags:      []string{"legacy", "shared"},
+				Locations: []RepoLocation{
+					{Path: "/repos-a/github.com/old-owner/models", LastSeenAt: now.Add(-2 * time.Hour)},
+					{Path: "/repos-b/github.com/old-owner/models", LastSeenAt: now.Add(-time.Hour)},
+				},
+			},
+			{
+				ID:        "github.com/new-owner/models",
+				RemoteURL: "https://github.com/new-owner/models",
+				Tags:      []string{"canonical", "shared"},
+				Locations: []RepoLocation{
+					{Path: "/repos-a/github.com/new-owner/models", LastSeenAt: now.Add(-time.Minute)},
+				},
+			},
+		},
+	}
+
+	changed := catalog.ApplyRepoMove(RepoMove{
+		OldID:   "github.com/old-owner/models",
+		NewID:   "github.com/new-owner/models",
+		NewURL:  "https://github.com/new-owner/models",
+		OldPath: "/repos-a/github.com/old-owner/models",
+		NewPath: "/repos-a/github.com/new-owner/models",
+		MovedAt: now,
+	})
+	if !changed {
+		t.Fatal("ApplyRepoMove() changed = false, want true")
+	}
+	if len(catalog.Repos) != 1 {
+		t.Fatalf("catalog repo count = %d, want 1", len(catalog.Repos))
+	}
+
+	repo := catalog.Repos[0]
+	if !reflect.DeepEqual(repo.Tags, []string{"canonical", "legacy", "shared"}) {
+		t.Fatalf("repo tags = %v, want merged tags", repo.Tags)
+	}
+	wantPaths := []string{
+		"/repos-a/github.com/new-owner/models",
+		"/repos-b/github.com/old-owner/models",
+	}
+	gotPaths := []string{repo.Locations[0].Path, repo.Locations[1].Path}
+	if !reflect.DeepEqual(gotPaths, wantPaths) {
+		t.Fatalf("repo location paths = %v, want %v", gotPaths, wantPaths)
+	}
+	if !repo.Locations[0].LastSeenAt.Equal(now) {
+		t.Fatalf("moved location last_seen_at = %s, want %s", repo.Locations[0].LastSeenAt, now)
+	}
+}
+
+func TestCatalogApplyRepoMove_UpdatesLocationAfterIdentityAlreadyMigrated(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	catalog := &Catalog{
+		Version: CatalogVersionV1,
+		Repos: []RepoEntry{
+			{
+				ID:        "github.com/new-owner/models",
+				RemoteURL: "https://github.com/new-owner/models",
+				Tags:      []string{"w:zucli"},
+				Locations: []RepoLocation{
+					{Path: "/repos-b/github.com/old-owner/models", LastSeenAt: now.Add(-time.Hour)},
+				},
+			},
+		},
+	}
+
+	changed := catalog.ApplyRepoMove(RepoMove{
+		OldID:   "github.com/old-owner/models",
+		NewID:   "github.com/new-owner/models",
+		NewURL:  "https://github.com/new-owner/models",
+		OldPath: "/repos-b/github.com/old-owner/models",
+		NewPath: "/repos-b/github.com/new-owner/models",
+		MovedAt: now,
+	})
+	if !changed {
+		t.Fatal("ApplyRepoMove() changed = false, want true")
+	}
+	if got := catalog.Repos[0].Locations[0].Path; got != "/repos-b/github.com/new-owner/models" {
+		t.Fatalf("repo location = %q, want rewritten location", got)
+	}
+}
+
+func TestCatalogApplyRepoMove_DoesNotAddLocationOwnedByAnotherCatalog(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	catalog := &Catalog{
+		Version: CatalogVersionV1,
+		Repos: []RepoEntry{
+			{
+				ID:        "github.com/old-owner/models",
+				RemoteURL: "https://github.com/old-owner/models",
+				Tags:      []string{"imported"},
+				Locations: []RepoLocation{
+					{Path: "/imported/github.com/old-owner/models", LastSeenAt: now.Add(-time.Hour)},
+				},
+			},
+		},
+	}
+
+	changed := catalog.ApplyRepoMove(RepoMove{
+		OldID:   "github.com/old-owner/models",
+		NewID:   "github.com/new-owner/models",
+		NewURL:  "https://github.com/new-owner/models",
+		OldPath: "/local/github.com/old-owner/models",
+		NewPath: "/local/github.com/new-owner/models",
+		MovedAt: now,
+	})
+	if !changed {
+		t.Fatal("ApplyRepoMove() changed = false, want true")
+	}
+
+	repo := catalog.Repos[0]
+	if repo.ID != "github.com/new-owner/models" {
+		t.Fatalf("repo id = %q, want canonical id", repo.ID)
+	}
+	if len(repo.Locations) != 1 || repo.Locations[0].Path != "/imported/github.com/old-owner/models" {
+		t.Fatalf("repo locations = %#v, want only imported location", repo.Locations)
+	}
+}
+
+func TestCatalogApplyRepoMove_NoMatchLeavesCatalogUnchanged(t *testing.T) {
+	t.Parallel()
+
+	catalog := &Catalog{
+		Version: CatalogVersionV1,
+		Repos:   []RepoEntry{{ID: "github.com/acme/api"}},
+	}
+
+	changed := catalog.ApplyRepoMove(RepoMove{
+		OldID: "github.com/old-owner/models",
+		NewID: "github.com/new-owner/models",
+	})
+	if changed {
+		t.Fatal("ApplyRepoMove() changed = true, want false")
+	}
+	if len(catalog.Repos) != 1 || catalog.Repos[0].ID != "github.com/acme/api" {
+		t.Fatalf("catalog repos = %#v, want unchanged catalog", catalog.Repos)
+	}
+}
+
 func TestLoadCatalog_NonExistentCreatesEmpty(t *testing.T) {
 	t.Parallel()
 

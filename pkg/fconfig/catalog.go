@@ -40,6 +40,16 @@ type RepoLocation struct {
 	LastSeenAt time.Time `yaml:"last_seen_at" json:"last_seen_at"`
 }
 
+type RepoMove struct {
+	OldID   string
+	NewID   string
+	OldURL  string
+	NewURL  string
+	OldPath string
+	NewPath string
+	MovedAt time.Time
+}
+
 func newCatalog() *Catalog {
 	return &Catalog{
 		Version: CatalogVersionV1,
@@ -75,6 +85,104 @@ func (c *Catalog) Upsert(entry RepoEntry) {
 	sort.Slice(c.Repos, func(i, j int) bool {
 		return c.Repos[i].ID < c.Repos[j].ID
 	})
+}
+
+func (c *Catalog) ApplyRepoMove(move RepoMove) bool {
+	if c == nil || move.NewID == "" {
+		return false
+	}
+
+	oldPath := cleanOptionalPath(move.OldPath)
+	newPath := cleanOptionalPath(move.NewPath)
+	matched := make(map[int]struct{})
+	foundOldIdentity := false
+	foundOldPath := false
+
+	for i, repo := range c.Repos {
+		if repo.ID == move.OldID && move.OldID != "" {
+			matched[i] = struct{}{}
+			foundOldIdentity = true
+		}
+		if repo.ID == move.NewID {
+			matched[i] = struct{}{}
+		}
+
+		if oldPath == "" {
+			continue
+		}
+		for _, location := range repo.Locations {
+			if filepath.Clean(location.Path) != oldPath {
+				continue
+			}
+			matched[i] = struct{}{}
+			foundOldIdentity = true
+			foundOldPath = true
+			break
+		}
+	}
+
+	if !foundOldIdentity {
+		return false
+	}
+
+	merged := RepoEntry{
+		ID:        move.NewID,
+		RemoteURL: move.NewURL,
+		Tags:      []string{},
+		Locations: []RepoLocation{},
+	}
+	for i, repo := range c.Repos {
+		if _, ok := matched[i]; !ok {
+			continue
+		}
+
+		if merged.RemoteURL == "" && repo.RemoteURL != "" {
+			merged.RemoteURL = repo.RemoteURL
+		}
+		merged.Tags = append(merged.Tags, repo.Tags...)
+
+		locations := make([]RepoLocation, 0, len(repo.Locations))
+		for _, location := range repo.Locations {
+			location.Path = filepath.Clean(location.Path)
+			if oldPath != "" && location.Path == oldPath && newPath != "" {
+				location.Path = newPath
+			}
+			locations = append(locations, location)
+		}
+		merged.Locations = mergeLocations(merged.Locations, locations)
+	}
+
+	if foundOldPath && newPath != "" {
+		merged.Locations = mergeLocations(merged.Locations, []RepoLocation{{
+			Path:       newPath,
+			LastSeenAt: move.MovedAt,
+		}})
+	}
+	merged.Tags = normalizeTags(merged.Tags)
+	merged = normalizeRepoEntry(merged)
+
+	repos := make([]RepoEntry, 0, len(c.Repos)-len(matched)+1)
+	for i, repo := range c.Repos {
+		if _, ok := matched[i]; ok {
+			continue
+		}
+		repos = append(repos, repo)
+	}
+	repos = append(repos, merged)
+	sort.Slice(repos, func(i, j int) bool {
+		return repos[i].ID < repos[j].ID
+	})
+	c.Repos = repos
+
+	return true
+}
+
+func cleanOptionalPath(path string) string {
+	if path == "" {
+		return ""
+	}
+
+	return filepath.Clean(path)
 }
 
 func (c *Catalog) UpsertRoot(path string, scannedAt time.Time) {

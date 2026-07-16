@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/go-git/go-git/v5"
 )
@@ -48,8 +49,14 @@ func gitRunUpdate(ctx context.Context, repoPath string) error {
 			//nolint:gocritic
 			switch v := err.(type) {
 			case *GitRepositoryMovedError:
-				if err1 := gitMove(ctx, repoPath, v.OldURL, v.NewURL); err1 != nil {
-					return err
+				move, moveErr := gitMove(ctx, repoPath, v.OldURL, v.NewURL)
+				if moveErr != nil {
+					return moveErr
+				}
+				if move != nil {
+					if migrateErr := migrateCatalogsForRepoMove(*move); migrateErr != nil {
+						return fmt.Errorf("repository moved but catalog migration failed: %w", migrateErr)
+					}
 				}
 				return nil
 			}

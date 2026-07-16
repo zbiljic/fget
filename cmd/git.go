@@ -28,6 +28,7 @@ import (
 	"github.com/tevino/abool/v2"
 	giturls "github.com/whilp/git-urls"
 
+	"github.com/zbiljic/fget/pkg/fconfig"
 	"github.com/zbiljic/fget/pkg/fsfind"
 	"github.com/zbiljic/fget/pkg/rhttp"
 )
@@ -1355,7 +1356,7 @@ func gitReclone(ctx context.Context, repoPath string) error {
 	return nil
 }
 
-func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
+func gitMove(ctx context.Context, repoPath, oldURL, newURL string) (*fconfig.RepoMove, error) {
 	// complicated update locking
 	if isUpdateMutexLocked, ok := ctx.Value(ctxKeyIsUpdateMutexLocked{}).(*abool.AtomicBool); ok {
 		if isUpdateMutexLocked.IsNotSet() {
@@ -1389,25 +1390,25 @@ func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
 
 	if dryRun {
 		ptermSuccessMessageStyle.Println("dry-run")
-		return nil
+		return nil, nil
 	}
 
 	oldID, err := gitRemoteURLProjectID(oldURL)
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	newID, err := gitRemoteURLProjectID(newURL)
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	if !strings.HasSuffix(repoPath, oldID) {
 		err = fmt.Errorf("unexpected repository path: %s", repoPath)
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	commonRepoPath := strings.TrimSuffix(repoPath, oldID)
@@ -1415,12 +1416,21 @@ func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
 	fs := osfs.New(commonRepoPath)
 
 	newRepoPath := filepath.Join(commonRepoPath, newID)
+	move := &fconfig.RepoMove{
+		OldID:   oldID,
+		NewID:   newID,
+		OldURL:  oldURL,
+		NewURL:  newURL,
+		OldPath: repoPath,
+		NewPath: newRepoPath,
+		MovedAt: time.Now().UTC(),
+	}
 
 	// check if destination exists
 	if _, err := fs.Stat(newID); err != nil {
 		if os.IsExist(err) {
 			ptermErrorMessageStyle.Println(err.Error())
-			return err
+			return nil, err
 		}
 	} else {
 		ptermWarningMessageStyle.Printfln("already exists: %s", newRepoPath)
@@ -1428,41 +1438,41 @@ func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
 		// just remove from old repo path
 		err = os.RemoveAll(repoPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		return nil
+		return move, nil
 	}
 
 	err = fs.MkdirAll(filepath.Dir(newID), os.ModePerm)
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	err = fs.Rename(oldID, newID)
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	newRepo, err := git.PlainOpen(newRepoPath)
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	config, err := newRepo.Config()
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	remote, ok := config.Remotes[git.DefaultRemoteName]
 	if !ok {
 		err = fmt.Errorf("missing remote: %s", git.DefaultRemoteName)
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	if repoURL := remote.URLs[0]; repoURL != "" {
@@ -1474,10 +1484,10 @@ func gitMove(ctx context.Context, repoPath, oldURL, newURL string) error {
 	err = newRepo.SetConfig(config)
 	if err != nil {
 		ptermErrorMessageStyle.Println(err.Error())
-		return err
+		return nil, err
 	}
 
 	ptermSuccessMessageStyle.Println("success")
 
-	return nil
+	return move, nil
 }
