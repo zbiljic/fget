@@ -25,7 +25,7 @@ func getWd() string {
 
 // hasScheme checks if the given URL string has a scheme defined
 func hasScheme(urlStr string) bool {
-	return len(urlStr) > 0 && (bytes.Contains([]byte(urlStr), []byte("://")))
+	return len(urlStr) > 0 && bytes.Contains([]byte(urlStr), []byte("://"))
 }
 
 func printProjectInfoContext(ctx context.Context) {

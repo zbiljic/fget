@@ -63,7 +63,8 @@ func init() {
 	listCmd.Flags().VarP(
 		enumflag.New(&listCmdFlags.OutputFormat, "output", OutputFormatIds, enumflag.EnumCaseInsensitive),
 		"output", "o",
-		"Output format: text|json|table")
+		"Output format: text|json|table",
+	)
 	listCmd.Flags().Uint16VarP(&listCmdFlags.MaxWorkers, "workers", "j", poolDefaultMaxWorkers, "Set the maximum number of workers to use")
 	listCmd.Flags().StringVarP(&listCmdFlags.SortBy, "sort", "s", "",
 		"Sort repositories by: [±]time|[±]name|[±]commits (prefix with - for reverse order)")

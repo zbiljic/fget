@@ -172,7 +172,8 @@ func runGc(cmd *cobra.Command, args []string) error {
 
 	pterm.Println()
 	ptermSuccessWithPrefixText(cmdName).
-		Printfln("took %s (total: %s)",
+		Printfln(
+			"took %s (total: %s)",
 			time.Since(startedAt).Round(time.Millisecond).String(),
 			time.Since(config.CreateTime).Round(time.Millisecond).String(),
 		)
