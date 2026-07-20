@@ -30,7 +30,7 @@ jobs:
         run: |
           echo "GO_VERSION=$( (grep -m1 '^toolchain go' go.mod || grep -m1 '^go ' go.mod) | sed -nE 's/.*go[[:space:]]*//p')" >> $GITHUB_ENV
           echo "GOLANGCI_LINT_VERSION=$(cat mise.toml | sed -En 's/golangci-lint.+"(.*)"/\1/p')" >> $GITHUB_ENV
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: golangci-lint
