@@ -10,7 +10,7 @@ require (
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
 	github.com/go-git/go-billy/v5 v5.9.1
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/mattn/go-isatty v0.0.24
 	github.com/plar/go-adaptive-radix-tree/v2 v2.0.4
