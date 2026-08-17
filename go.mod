@@ -21,7 +21,7 @@ require (
 	github.com/thediveo/enumflag/v2 v2.2.1
 	github.com/whilp/git-urls v1.0.0
 	github.com/zbiljic/gitexec v0.0.0-20260803021135-3561e580c0b2
-	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743
+	golang.org/x/exp v0.0.0-20260813180055-c1d0aacb2297
 	gopkg.in/yaml.v3 v3.0.1
 )
 
