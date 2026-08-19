@@ -2,6 +2,8 @@ package fconfig
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -44,14 +46,6 @@ func SyncCatalog(
 	}
 
 	scannedRoots := normalizePaths(opts.Roots)
-	for _, root := range scannedRoots {
-		catalog.UpsertRoot(root, now)
-	}
-
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
 	paths, err := find(scannedRoots...)
 	if err != nil {
 		return err
@@ -62,22 +56,26 @@ func SyncCatalog(
 	progress := synchronizedProgressReporter(opts.Progress)
 	reportSyncProgress(progress, 0, len(paths))
 
+	repos, err := inspectRepos(ctx, paths, inspect, opts.Workers, progress)
+	if err != nil {
+		return err
+	}
+	if err := inspectionErrors(repos); err != nil {
+		return err
+	}
+
+	for _, root := range scannedRoots {
+		catalog.UpsertRoot(root, now)
+	}
+
 	repoIndex := make(map[string]int, len(catalog.Repos))
 	for i := range catalog.Repos {
 		repoIndex[catalog.Repos[i].ID] = i
 	}
 
 	seen := make(map[string]map[string]struct{}, len(paths))
-	repos, err := inspectRepos(ctx, paths, inspect, opts.Workers, progress)
-	if err != nil {
-		return err
-	}
 
 	for _, repo := range repos {
-		if !repo.OK || repo.Metadata.ID == "" {
-			continue
-		}
-
 		discoveredPath := repo.Path
 		repoMetadata := repo.Metadata
 		repoPath := filepath.Clean(repo.Path)
@@ -118,6 +116,7 @@ type inspectedRepo struct {
 	Path     string
 	Metadata RepoMetadata
 	OK       bool
+	Err      error
 }
 
 func inspectRepos(
@@ -194,8 +193,17 @@ func inspectRepos(
 
 func inspectRepoPath(path string, inspect Inspector) inspectedRepo {
 	repo, err := inspect(path)
-	if err != nil || repo.ID == "" {
-		return inspectedRepo{}
+	if err != nil {
+		return inspectedRepo{
+			Path: path,
+			Err:  fmt.Errorf("inspect repository %q: %w", path, err),
+		}
+	}
+	if repo.ID == "" {
+		return inspectedRepo{
+			Path: path,
+			Err:  fmt.Errorf("inspect repository %q: empty repository ID", path),
+		}
 	}
 
 	return inspectedRepo{
@@ -203,6 +211,29 @@ func inspectRepoPath(path string, inspect Inspector) inspectedRepo {
 		Metadata: repo,
 		OK:       true,
 	}
+}
+
+func inspectionErrors(repos []inspectedRepo) error {
+	failures := make([]inspectedRepo, 0)
+	for _, repo := range repos {
+		if repo.Err != nil {
+			failures = append(failures, repo)
+		}
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+
+	sort.Slice(failures, func(i, j int) bool {
+		return failures[i].Path < failures[j].Path
+	})
+
+	errs := make([]error, 0, len(failures))
+	for _, failure := range failures {
+		errs = append(errs, failure.Err)
+	}
+
+	return errors.Join(errs...)
 }
 
 func normalizedSyncWorkerCount(workers, total int) int {

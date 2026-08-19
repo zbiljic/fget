@@ -2,13 +2,207 @@ package fconfig
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestInspectRepoPath(t *testing.T) {
+	t.Parallel()
+
+	inspectErr := errors.New("cannot read repository metadata")
+	tests := []struct {
+		name    string
+		path    string
+		inspect Inspector
+		wantErr error
+	}{
+		{
+			name: "inspector error",
+			path: "/repos/src/unreadable",
+			inspect: func(string) (RepoMetadata, error) {
+				return RepoMetadata{}, inspectErr
+			},
+			wantErr: inspectErr,
+		},
+		{
+			name: "empty repository ID",
+			path: "/repos/src/malformed",
+			inspect: func(path string) (RepoMetadata, error) {
+				return RepoMetadata{Path: path}, nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := inspectRepoPath(tt.path, tt.inspect)
+			if got.Path != tt.path {
+				t.Fatalf("inspectRepoPath() path = %q, want %q", got.Path, tt.path)
+			}
+			if got.Err == nil {
+				t.Fatal("inspectRepoPath() error = nil, want error")
+			}
+			if !strings.Contains(got.Err.Error(), tt.path) {
+				t.Fatalf("inspectRepoPath() error = %q, want path %q", got.Err, tt.path)
+			}
+			if tt.wantErr != nil && !errors.Is(got.Err, tt.wantErr) {
+				t.Fatalf("inspectRepoPath() error = %v, want wrapped %v", got.Err, tt.wantErr)
+			}
+			if got.OK {
+				t.Fatal("inspectRepoPath() OK = true, want false")
+			}
+		})
+	}
+}
+
+func TestSyncCatalog_InspectionFailuresLeaveCatalogUnchanged(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		paths     []string
+		failed    map[string]error
+		workers   int
+		prune     bool
+		wantOrder []string
+	}{
+		{
+			name: "single failure without prune",
+			paths: []string{
+				"/repos/src/unreadable",
+			},
+			failed: map[string]error{
+				"/repos/src/unreadable": errors.New("permission denied"),
+			},
+			workers:   1,
+			wantOrder: []string{"/repos/src/unreadable"},
+		},
+		{
+			name: "multiple failures with prune and workers",
+			paths: []string{
+				"/repos/src/zeta",
+				"/repos/src/healthy",
+				"/repos/src/alpha",
+			},
+			failed: map[string]error{
+				"/repos/src/zeta":  errors.New("bad config"),
+				"/repos/src/alpha": errors.New("unreadable config"),
+			},
+			workers:   3,
+			prune:     true,
+			wantOrder: []string{"/repos/src/alpha", "/repos/src/zeta"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			oldRootScan := time.Date(2025, time.January, 2, 3, 4, 5, 0, time.UTC)
+			oldRepoSeen := oldRootScan.Add(time.Hour)
+			catalog := &Catalog{
+				Version:   CatalogVersionV1,
+				UpdatedAt: oldRootScan.Add(-time.Hour),
+				ScopeRoot: "/repos",
+				Roots: []CatalogRoot{
+					{Path: "/repos/src", LastScannedAt: oldRootScan},
+				},
+				Repos: []RepoEntry{
+					{
+						ID:        "github.com/acme/existing",
+						RemoteURL: "https://example.com/acme/existing",
+						Tags:      []string{"keep"},
+						Locations: []RepoLocation{
+							{Path: "/repos/src/existing", LastSeenAt: oldRepoSeen},
+						},
+					},
+				},
+			}
+			before := cloneCatalogForSyncTest(catalog)
+
+			var progressEvents []struct {
+				processed int
+				total     int
+			}
+			err := SyncCatalog(context.Background(), catalog, SyncOptions{
+				Roots:   []string{"/repos/src"},
+				Workers: tt.workers,
+				Prune:   tt.prune,
+				Progress: func(processed, total int) {
+					progressEvents = append(progressEvents, struct {
+						processed int
+						total     int
+					}{processed: processed, total: total})
+				},
+			}, func(roots ...string) ([]string, error) {
+				return append([]string{}, tt.paths...), nil
+			}, func(path string) (RepoMetadata, error) {
+				if err := tt.failed[path]; err != nil {
+					return RepoMetadata{}, err
+				}
+				return RepoMetadata{
+					ID:        "github.com/acme/healthy",
+					Path:      path,
+					RemoteURL: "https://example.com/acme/healthy",
+				}, nil
+			}, oldRootScan.Add(24*time.Hour))
+			if err == nil {
+				t.Fatal("SyncCatalog() error = nil, want inspection error")
+			}
+
+			lastIndex := -1
+			for _, path := range tt.wantOrder {
+				index := strings.Index(err.Error(), path)
+				if index == -1 {
+					t.Fatalf("SyncCatalog() error = %q, want path %q", err, path)
+				}
+				if index <= lastIndex {
+					t.Fatalf("SyncCatalog() error = %q, want paths in order %v", err, tt.wantOrder)
+				}
+				lastIndex = index
+			}
+			if !reflect.DeepEqual(catalog, before) {
+				t.Fatalf("catalog changed after inspection failure:\n got: %#v\nwant: %#v", catalog, before)
+			}
+
+			maxProcessed := 0
+			for _, event := range progressEvents {
+				if event.total != len(tt.paths) {
+					t.Fatalf("progress total = %d, want %d", event.total, len(tt.paths))
+				}
+				if event.processed > maxProcessed {
+					maxProcessed = event.processed
+				}
+			}
+			if maxProcessed != len(tt.paths) {
+				t.Fatalf("progress reached %d, want %d; events = %#v", maxProcessed, len(tt.paths), progressEvents)
+			}
+		})
+	}
+}
+
+func cloneCatalogForSyncTest(catalog *Catalog) *Catalog {
+	clone := *catalog
+	clone.Roots = append([]CatalogRoot{}, catalog.Roots...)
+	clone.Repos = make([]RepoEntry, len(catalog.Repos))
+	for i, repo := range catalog.Repos {
+		clone.Repos[i] = repo
+		clone.Repos[i].Tags = append([]string{}, repo.Tags...)
+		clone.Repos[i].Locations = append([]RepoLocation{}, repo.Locations...)
+	}
+
+	return &clone
+}
 
 func TestSyncCatalog_ReportsProgress(t *testing.T) {
 	t.Parallel()

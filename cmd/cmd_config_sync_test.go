@@ -1,11 +1,101 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/zbiljic/fget/pkg/fconfig"
+	"github.com/zbiljic/fget/pkg/vconfig"
 )
+
+func TestRunConfigSync_DoesNotSaveCatalogOnInspectionError(t *testing.T) {
+	tmp := t.TempDir()
+	scanRoot := filepath.Join(tmp, "repos")
+	malformedRepo := filepath.Join(scanRoot, "malformed")
+	if err := os.MkdirAll(filepath.Join(malformedRepo, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.git) error = %v", err)
+	}
+
+	catalogPath := filepath.Join(tmp, "fget.catalog.yaml")
+	oldTimestamp := time.Date(2025, time.January, 2, 3, 4, 5, 0, time.UTC)
+	if err := fconfig.SaveCatalog(catalogPath, &fconfig.Catalog{
+		Version: fconfig.CatalogVersionV1,
+		Roots: []fconfig.CatalogRoot{
+			{Path: scanRoot, LastScannedAt: oldTimestamp},
+		},
+		Repos: []fconfig.RepoEntry{
+			{
+				ID:        "github.com/acme/existing",
+				RemoteURL: "https://example.com/acme/existing",
+				Tags:      []string{"keep"},
+				Locations: []fconfig.RepoLocation{
+					{Path: filepath.Join(scanRoot, "existing"), LastSeenAt: oldTimestamp},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCatalog() error = %v", err)
+	}
+	before, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatalf("ReadFile(catalog before sync) error = %v", err)
+	}
+
+	if err := vconfig.SaveConfig(&fconfig.Config{
+		Version: fconfig.ConfigVersionV2,
+		Roots:   []string{scanRoot},
+		Catalog: fconfig.CatalogConfig{Path: catalogPath},
+	}, filepath.Join(tmp, "fget.yaml")); err != nil {
+		t.Fatalf("SaveConfig() error = %v", err)
+	}
+
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("Chdir(%q) error = %v", tmp, err)
+	}
+
+	originalFlags := configSyncCmdFlags
+	configSyncCmdFlags = configSyncOptions{
+		Prune:   true,
+		Silent:  true,
+		Workers: 2,
+	}
+	defer func() {
+		configSyncCmdFlags = originalFlags
+	}()
+
+	command := &cobra.Command{}
+	command.SetContext(context.Background())
+	err = runConfigSync(command, nil)
+	if err == nil {
+		t.Fatal("runConfigSync() error = nil, want inspection error")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte(malformedRepo)) {
+		t.Fatalf("runConfigSync() error = %q, want repository path %q", err, malformedRepo)
+	}
+
+	after, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatalf("ReadFile(catalog after sync) error = %v", err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Fatalf("catalog file changed after inspection error:\n before: %s\n after: %s", before, after)
+	}
+}
 
 func TestParseConfigSyncArgs(t *testing.T) {
 	t.Parallel()
