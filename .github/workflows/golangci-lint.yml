@@ -18,6 +18,25 @@ permissions:
   pull-requests: read
 
 jobs:
+  test:
+    name: test
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set Github ENV variables
+        shell: bash
+        run: |
+          echo "GO_VERSION=$( (grep -m1 '^toolchain go' go.mod || grep -m1 '^go ' go.mod) | sed -nE 's/.*go[[:space:]]*//p')" >> $GITHUB_ENV
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: test
+        run: go test ./...
+      - name: vet
+        run: go vet ./...
+
   golangci:
     name: lint
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
