@@ -42,18 +42,25 @@ func GetVersion(filename string) (string, error) {
 	return config.Version, nil
 }
 
-// LoadConfig loads JSON config from filename.
+// LoadConfig loads JSON or YAML config from filename.
 func LoadConfig[T any](filename string) (*T, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
+	return LoadConfigData[T](data, filename)
+}
 
+// LoadConfigData loads JSON or YAML config data using filename to select the format.
+func LoadConfigData[T any](data []byte, filename string) (*T, error) {
 	if runtime.GOOS == "windows" {
 		data = []byte(strings.ReplaceAll(string(data), "\r\n", "\n"))
 	}
 
-	var config *T
+	var (
+		config *T
+		err    error
+	)
 	if hasYAMLExtension(filename) {
 		config, err = yamlUnmarshalAny[T](data)
 	} else {

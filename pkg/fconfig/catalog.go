@@ -255,22 +255,27 @@ func LoadCatalogWithScope(path, scopeRoot string) (*Catalog, error) {
 		return catalog, nil
 	}
 
-	version, err := vconfig.GetVersion(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return LoadCatalogData(data, path, scopeRoot)
+}
+
+// LoadCatalogData parses a catalog snapshot using path to select JSON or YAML.
+func LoadCatalogData(data []byte, path, scopeRoot string) (*Catalog, error) {
+	catalog, err := vconfig.LoadConfigData[Catalog](data, path)
 	if err != nil {
 		return nil, err
 	}
 
-	switch version {
+	switch catalog.Version {
 	case "", CatalogVersionV1:
-		catalog, err := vconfig.LoadConfig[Catalog](path)
-		if err != nil {
-			return nil, err
-		}
 		catalog.ScopeRoot = cleanScopeRoot(scopeRoot)
 		normalizeLoadedCatalog(catalog)
 		return catalog, nil
 	default:
-		return nil, fmt.Errorf("unsupported catalog version %q", version)
+		return nil, fmt.Errorf("unsupported catalog version %q", catalog.Version)
 	}
 }
 

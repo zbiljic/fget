@@ -42,6 +42,7 @@ func init() {
 	catalogCmd.AddCommand(catalogListCmd)
 	catalogCmd.AddCommand(catalogShowCmd)
 	catalogCmd.AddCommand(catalogPathsCmd)
+	catalogCmd.AddCommand(catalogExportCmd)
 }
 
 func runCatalogList(_ *cobra.Command, args []string) error {
