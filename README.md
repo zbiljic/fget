@@ -227,6 +227,20 @@ fget catalog list
 fget catalog show github.com/zbiljic/fget
 fget catalog paths github.com/zbiljic/fget github.com/cli/cli
 
+# Export deterministic, location-level inventory records without scanning repositories
+fget catalog export --location-root ~/dev --output jsonl
+
+# Export one reproducible batch from a catalog snapshot stored on another volume
+fget catalog export \
+  --catalog /backup/fget.catalog.snapshot.yaml \
+  --scope-root ~ \
+  --location-root ~/dev \
+  --sort host \
+  --batch-size 250 \
+  --batch 1 \
+  --output jsonl \
+  --output-file batch-0001.jsonl
+
 # Create/update local link projection config in the current directory
 fget link init fs___ --source-root ~/dev/src
 
@@ -236,6 +250,8 @@ fget link sync
 ```
 
 `config init` creates or updates `fget.yaml`; `catalog sync` creates or refreshes the active scope's owned `fget.catalog.yaml`.
+
+`catalog export` reads catalog metadata only; it does not inspect or modify repository directories. It emits one record per catalog location in `json`, `jsonl`, or `tsv` format. Records include the catalog SHA-256 digest, stable ordinal and batch number, repository identity, physical location, host, owner, tags, and last-seen time. Filters for `--location-root`, `--host`, and `--tag` are repeatable. A positive `--batch-size` assigns deterministic 1-based batches; add `--batch N` to emit only one. Explicit snapshot catalogs can use `--scope-root` to resolve their relative paths against the original source volume. File output is written atomically; `--output-file -` writes data directly to stdout.
 
 Projection directories can reuse the same `fget.yaml` format, or you can generate/update the
 `link:` block with `fget link init <tag...>`:
