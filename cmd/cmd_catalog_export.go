@@ -332,9 +332,7 @@ func sortCatalogExportRecords(records []catalogExportRecord, order string) {
 func writeCatalogExport(w io.Writer, format string, records []catalogExportRecord) error {
 	switch format {
 	case "json":
-		encoder := json.NewEncoder(w)
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(records)
+		return outputJSON(w, records)
 	case "jsonl":
 		encoder := json.NewEncoder(w)
 		for _, record := range records {
@@ -381,31 +379,5 @@ func writeCatalogExportTSV(w io.Writer, records []catalogExportRecord) error {
 }
 
 func writeCatalogExportFile(path string, write func(io.Writer) error) (err error) {
-	path, err = filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	temp, err := os.CreateTemp(filepath.Dir(path), ".fget-catalog-export-*")
-	if err != nil {
-		return err
-	}
-	tempPath := temp.Name()
-	defer func() {
-		_ = temp.Close()
-		_ = os.Remove(tempPath)
-	}()
-
-	if err := write(temp); err != nil {
-		return err
-	}
-	if err := temp.Chmod(0o644); err != nil {
-		return err
-	}
-	if err := temp.Sync(); err != nil {
-		return err
-	}
-	if err := temp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tempPath, path)
+	return writeAtomicOutputFile(path, ".fget-catalog-export-*", write)
 }
