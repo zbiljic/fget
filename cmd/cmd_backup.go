@@ -4,7 +4,7 @@ import "github.com/spf13/cobra"
 
 var backupCmd = &cobra.Command{
 	Use:   "backup",
-	Short: "Inspect backup readiness without modifying repositories",
+	Short: "Audit, create, and verify repository backups",
 }
 
 func init() {
