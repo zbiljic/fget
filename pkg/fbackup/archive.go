@@ -9,7 +9,38 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+
+	"github.com/zbiljic/fget/pkg/gitinspect"
 )
+
+func runGitToFile(ctx context.Context, runner gitinspect.StreamingRunner, repoPath, output string, args ...string) error {
+	f, err := os.OpenFile(output, os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_, err = runner.RunTo(ctx, repoPath, f, args...)
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
+func writeUntrackedTar(ctx context.Context, runner gitinspect.Runner, repoPath, output string) error {
+	out, err := runner.Run(ctx, repoPath, "ls-files", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return err
+	}
+	var paths []string
+	for _, p := range strings.Split(out.Stdout, "\x00") {
+		if p != "" {
+			paths = append(paths, p)
+		}
+	}
+	sort.Strings(paths)
+	return writeTar(ctx, repoPath, output, paths)
+}
 
 func writeFullTar(ctx context.Context, repoPath, output string) error {
 	var paths []string
