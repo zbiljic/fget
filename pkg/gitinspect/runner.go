@@ -3,6 +3,7 @@ package gitinspect
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -11,6 +12,13 @@ import (
 // Runner executes the Git commands used by repository inspection helpers.
 type Runner interface {
 	Run(ctx context.Context, dir string, args ...string) (Result, error)
+}
+
+// StreamingRunner can stream Git stdout without buffering large or binary
+// output in memory.
+type StreamingRunner interface {
+	Runner
+	RunTo(ctx context.Context, dir string, stdout io.Writer, args ...string) (Result, error)
 }
 
 // Result contains the output captured from a Git command.
@@ -56,22 +64,34 @@ func (e *CommandError) Unwrap() error {
 type CLIRunner struct{}
 
 func (CLIRunner) Run(ctx context.Context, dir string, args ...string) (Result, error) {
+	var stdout bytes.Buffer
+	return runCLI(ctx, dir, &stdout, &stdout, args...)
+}
+
+func (CLIRunner) RunTo(ctx context.Context, dir string, stdout io.Writer, args ...string) (Result, error) {
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	return runCLI(ctx, dir, stdout, nil, args...)
+}
+
+func runCLI(ctx context.Context, dir string, stdout io.Writer, capturedStdout *bytes.Buffer, args ...string) (Result, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
 
-	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
+	cmd.Stdout = stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	result := Result{
-		Stdout: stdout.String(),
 		Stderr: stderr.String(),
 	}
+	if capturedStdout != nil {
+		result.Stdout = capturedStdout.String()
+	}
 	if err != nil {
-
 		exitCode := -1
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
