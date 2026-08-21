@@ -280,19 +280,32 @@ With the example above, any catalog repo tagged `fs___` is projected under the c
 
 If a catalog repo has multiple locations, set `link.source_root` so `fget` can choose the correct clone path.
 
-### `backup audit`: Classify repositories for backup planning
+### `backup`: Audit, create, and verify restartable artifacts
 
-This command inspects local repositories and writes a deterministic JSON manifest without fetching, pulling, updating the catalog, or creating any backup data.
+The backup workflow first audits repositories into a deterministic JSON
+manifest, then writes resumable artifacts to local storage, and finally
+verifies those artifacts independently.
 
 ```sh
-# Write the manifest to stdout
-fget backup audit ~/src --output -
+# Classify repositories and verify which remotes can reconstruct them
+fget backup audit ~/src \
+  --output audit.json \
+  --verify-remotes \
+  --workers 16
 
-# Verify remotes and save the manifest outside the audited tree
-fget backup audit ~/src ~/work/src --output ~/tmp/fget-backup.json --verify-remotes --workers 16
+# Create a backup from the audit manifest
+fget backup create \
+  --manifest audit.json \
+  --destination /Volumes/backup/fget
+
+# Verify checksums, Git bundles, and archive contents
+fget backup verify \
+  --backup /Volumes/backup/fget \
+  --deep
 ```
 
-Operational guarantees:
+`backup audit` does not fetch, pull, update the catalog, or create backup data.
+Its classifications are deliberately conservative:
 
 - Every Git subprocess runs with `GIT_OPTIONAL_LOCKS=0` so the audit can run safely against a read-only source tree.
 - Each repository records its exact HEAD commit and attached branch, configured upstream commit, and a deterministic digest/count of local refs.
@@ -305,7 +318,20 @@ Operational guarantees:
 - `full` means the remote was verified unavailable or local Git LFS objects require preservation, even when remote verification was skipped.
 - `problem` means inspection was incomplete or inconsistent and needs manual review.
 
-`fget backup audit` does not create, copy, delete, or restore backup data. It only produces a manifest that another process can use for backup decisions.
+`backup create` embeds the sanitized audit manifest in `backup.json` and refuses
+`problem` and `unknown` entries. Before treating a repository as metadata-only,
+it confirms that the repository is still clean, its Git state still matches the
+audit, and its origin is still reachable. Delta repositories store a Git bundle, separate
+`index.patch` (HEAD to index) and `tracked.patch` (index to worktree) layers,
+and non-ignored untracked files; full repositories store a complete archive.
+The command never deletes or modifies source repositories and can resume after
+interruption without rewriting verified artifacts. `backup.json` is the only
+checkpoint and artifact index; after it is marked complete, create verifies it
+but never repairs or rewrites it in place.
+
+Estimate capacity from each manifest entry's `estimated_source_bytes`, adding
+room for bundles, patches, and temporary files. Keep the manifest and
+destination outside the audited repository tree.
 
 ## Contributing
 
