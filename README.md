@@ -280,6 +280,33 @@ With the example above, any catalog repo tagged `fs___` is projected under the c
 
 If a catalog repo has multiple locations, set `link.source_root` so `fget` can choose the correct clone path.
 
+### `backup audit`: Classify repositories for backup planning
+
+This command inspects local repositories and writes a deterministic JSON manifest without fetching, pulling, updating the catalog, or creating any backup data.
+
+```sh
+# Write the manifest to stdout
+fget backup audit ~/src --output -
+
+# Verify remotes and save the manifest outside the audited tree
+fget backup audit ~/src ~/work/src --output ~/tmp/fget-backup.json --verify-remotes --workers 16
+```
+
+Operational guarantees:
+
+- Every Git subprocess runs with `GIT_OPTIONAL_LOCKS=0` so the audit can run safely against a read-only source tree.
+- Each repository records its exact HEAD commit and attached branch, configured upstream commit, and a deterministic digest/count of local refs.
+- Inspection failures are emitted as structured, sanitized `errors` with stable codes and operation names; raw Git diagnostics are not written to the manifest.
+- Remote URLs in the manifest are sanitized before writing JSON; embedded HTTPS credentials are removed while normal SSH identity is preserved.
+- `unknown` is the default class when `--verify-remotes` is omitted, unless local Git LFS objects already require `full`. Treat `unknown` as conservative and never disposable.
+- `recloneable` is reserved for repositories that were verified reachable, clean, have no local-only commits, and do not depend on local Git LFS objects.
+- Repositories with Git submodules are reported conservatively because the audit does not recurse into nested repositories before assigning backup safety.
+- `delta` means the remote was verified reachable but local-only history or working tree content still needs preservation.
+- `full` means the remote was verified unavailable or local Git LFS objects require preservation, even when remote verification was skipped.
+- `problem` means inspection was incomplete or inconsistent and needs manual review.
+
+`fget backup audit` does not create, copy, delete, or restore backup data. It only produces a manifest that another process can use for backup decisions.
+
 ## Contributing
 
 Contributions are welcome!
