@@ -74,6 +74,8 @@ func expectedArtifactKinds(classification Classification) []string {
 	switch classification {
 	case ClassificationRecloneable:
 		return nil
+	case ClassificationDelta:
+		return []string{"bundle", "index-patch", "patch", "untracked"}
 	case ClassificationFull:
 		return []string{"full"}
 	default:

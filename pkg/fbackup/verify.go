@@ -109,7 +109,7 @@ func expectedRepositoryArtifacts(entries []RepositoryEntry) (map[string]map[stri
 			return nil, fmt.Errorf("duplicate repository manifest entry %q", entry.ID)
 		}
 		switch entry.Classification {
-		case ClassificationRecloneable, ClassificationFull:
+		case ClassificationRecloneable, ClassificationDelta, ClassificationFull:
 		default:
 			return nil, fmt.Errorf("unsupported repository classification %q", entry.Classification)
 		}
@@ -153,7 +153,11 @@ func verifyRecord(destination string, record ArtifactRecord) error {
 func verifyDeepArtifact(ctx context.Context, runner gitinspect.Runner, destination string, record ArtifactRecord) error {
 	path := filepath.Join(destination, filepath.FromSlash(record.Path))
 	switch record.Kind {
-	case "full":
+	case "bundle":
+		if _, err := runner.Run(ctx, "", "bundle", "verify", path); err != nil {
+			return fmt.Errorf("artifact %q bundle verification failed: %w", record.RepositoryID, err)
+		}
+	case "full", "untracked":
 		if err := verifyTar(ctx, path); err != nil {
 			return fmt.Errorf("artifact %q tar verification failed: %w", record.RepositoryID, err)
 		}

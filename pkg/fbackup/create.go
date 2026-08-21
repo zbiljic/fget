@@ -107,7 +107,7 @@ func prepareCreateOptions(options CreateOptions) (CreateOptions, string, string,
 			if repository.RemoteState != RemoteStateReachable {
 				return options, "", "", fmt.Errorf("recloneable repository %q does not have a verified remote", repository.ID)
 			}
-		case ClassificationFull:
+		case ClassificationDelta, ClassificationFull:
 		default:
 			return options, "", "", fmt.Errorf("repository %q has unsupported classification %q", repository.ID, repository.Classification)
 		}
@@ -174,6 +174,13 @@ func createRepository(
 	}
 	specifications := []struct{ kind, name string }{}
 	switch repository.Classification {
+	case ClassificationDelta:
+		specifications = append(specifications,
+			struct{ kind, name string }{"bundle", "repository.bundle"},
+			struct{ kind, name string }{"index-patch", "index.patch"},
+			struct{ kind, name string }{"patch", "tracked.patch"},
+			struct{ kind, name string }{"untracked", "untracked.tar.gz"},
+		)
 	case ClassificationFull:
 		specifications = append(specifications, struct{ kind, name string }{"full", "full.tar.gz"})
 	}
@@ -197,6 +204,14 @@ func createRepository(
 
 		var writeErr error
 		switch specification.kind {
+		case "bundle":
+			_, writeErr = runner.Run(ctx, repository.Path, "bundle", "create", temporaryPath, "--all")
+		case "index-patch":
+			writeErr = runGitToFile(ctx, runner, repository.Path, temporaryPath, "diff", "--cached", "--binary", "HEAD")
+		case "patch":
+			writeErr = runGitToFile(ctx, runner, repository.Path, temporaryPath, "diff", "--binary")
+		case "untracked":
+			writeErr = writeUntrackedTar(ctx, runner, repository.Path, temporaryPath)
 		case "full":
 			writeErr = writeFullTar(ctx, repository.Path, temporaryPath)
 		}
