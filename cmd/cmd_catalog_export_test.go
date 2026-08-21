@@ -118,6 +118,27 @@ func TestBuildCatalogExportRecordsIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestBuildCatalogExportRecordsSanitizesRemoteURL(t *testing.T) {
+	t.Parallel()
+
+	catalog := &fconfig.Catalog{
+		Version: fconfig.CatalogVersionV1,
+		Repos: []fconfig.RepoEntry{{
+			ID:        "example.com/acme/repo",
+			RemoteURL: "https://user:secret@example.com/acme/repo.git",
+			Locations: []fconfig.RepoLocation{{Path: "/src/repo"}},
+		}},
+	}
+
+	records, err := buildCatalogExportRecords(catalog, "sha256:snapshot", catalogExportFlags{Sort: "id"})
+	if err != nil {
+		t.Fatalf("buildCatalogExportRecords() error = %v", err)
+	}
+	if len(records) != 1 || records[0].RemoteURL != "https://example.com/acme/repo.git" {
+		t.Fatalf("records = %+v, want sanitized remote URL", records)
+	}
+}
+
 func TestBuildCatalogExportRecordsResolvesRelativeLocationRoots(t *testing.T) {
 	t.Parallel()
 

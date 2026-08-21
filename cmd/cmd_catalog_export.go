@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/zbiljic/fget/pkg/fconfig"
+	"github.com/zbiljic/fget/pkg/giturl"
 )
 
 const catalogExportSchemaVersion = "1"
@@ -208,7 +209,7 @@ func buildCatalogExportRecords(
 				SchemaVersion: catalogExportSchemaVersion,
 				CatalogDigest: digest,
 				ID:            repo.ID,
-				RemoteURL:     repo.RemoteURL,
+				RemoteURL:     giturl.Sanitize(repo.RemoteURL),
 				Location:      filepath.Clean(location.Path),
 				Host:          host,
 				Owner:         owner,
