@@ -287,11 +287,11 @@ With the example above, any catalog repo tagged `fs___` is projected under the c
 
 If a catalog repo has multiple locations, set `link.source_root` so `fget` can choose the correct clone path.
 
-### `backup`: Audit, create, and verify restartable artifacts
+### `backup`: Audit, create, verify, and restore restartable artifacts
 
-The backup workflow first audits repositories into a deterministic JSON
-manifest, then writes resumable artifacts to local storage, and finally
-verifies those artifacts independently.
+The backup workflow audits repositories into a deterministic JSON manifest,
+writes resumable artifacts to local storage, verifies those artifacts
+independently, and restores them into a separate destination.
 
 ```sh
 # Classify repositories and verify which remotes can reconstruct them
@@ -336,6 +336,34 @@ resume after interruption without rewriting verified artifacts. During
 creation, `backup.json` is both the only checkpoint and the artifact index.
 After it is marked complete, `backup create` verifies it but never repairs or
 rewrites it in place.
+
+Start a restore in a new, empty destination root. A later invocation may resume
+in that same root only when its checkpoint matches the backup and its existing
+repository paths pass validation. Perform a dry run first, then restore,
+re-verify the backup, and inspect the restored result before replacing any
+working tree; restore is never an in-place operation:
+
+```sh
+fget backup restore \
+  --backup /Volumes/backup/fget \
+  --destination "$(mktemp -d)" \
+  --dry-run
+
+fget backup restore \
+  --backup /Volumes/backup/fget \
+  --destination /tmp/fget-restored
+
+fget backup verify \
+  --backup /Volumes/backup/fget \
+  --deep
+```
+
+Restore verifies every artifact before creating repository paths, publishes each
+repository atomically, and records completed repositories so an interrupted run
+can safely resume without overwriting unrelated files. The restore checkpoint,
+`.fget.restore-state.json`, remains in the destination after success as a record
+of completed repositories. Inspect restored refs and working-tree changes before
+using the restored tree.
 
 Estimate capacity from each manifest entry's `estimated_source_bytes`, adding
 room for bundles, patches, and temporary files. Keep the manifest and
