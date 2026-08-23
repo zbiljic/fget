@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -125,4 +126,88 @@ func writeTar(ctx context.Context, root, output string, paths []string) error {
 		return err
 	}
 	return f.Sync()
+}
+
+func extractTar(path, root string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	gz, err := gzip.NewReader(file)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = gz.Close() }()
+
+	tr := tar.NewReader(gz)
+	directoryModes := map[string]os.FileMode{}
+	for {
+		h, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		name := filepath.ToSlash(h.Name)
+		if !safeRelativePath(name) {
+			return fmt.Errorf("unsafe tar member path %q", h.Name)
+		}
+		target := filepath.Join(root, filepath.FromSlash(name))
+		if err := ensureSafeDirectory(root, filepath.ToSlash(filepath.Dir(name))); err != nil {
+			return err
+		}
+		if _, err := os.Lstat(target); err == nil {
+			return fmt.Errorf("tar member already exists: %q", name)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+
+		switch h.Typeflag {
+		case tar.TypeDir:
+			if err := os.Mkdir(target, os.FileMode(h.Mode)|0o700); err != nil {
+				return err
+			}
+			directoryModes[target] = os.FileMode(h.Mode)
+		case tar.TypeReg:
+			out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(h.Mode))
+			if err != nil {
+				return err
+			}
+			_, copyErr := io.Copy(out, tr)
+			closeErr := out.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+		case tar.TypeSymlink:
+			if filepath.IsAbs(h.Linkname) || filepath.VolumeName(h.Linkname) != "" {
+				return fmt.Errorf("unsafe tar symlink %q", h.Linkname)
+			}
+			resolved := filepath.Clean(filepath.Join(filepath.Dir(name), filepath.FromSlash(h.Linkname)))
+			if !safeRelativePath(filepath.ToSlash(resolved)) {
+				return fmt.Errorf("unsafe tar symlink %q", h.Linkname)
+			}
+			if err := os.Symlink(h.Linkname, target); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported tar member type %d", h.Typeflag)
+		}
+	}
+
+	paths := make([]string, 0, len(directoryModes))
+	for directory := range directoryModes {
+		paths = append(paths, directory)
+	}
+	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) > len(paths[j]) })
+	for _, directory := range paths {
+		if err := os.Chmod(directory, directoryModes[directory]); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -19,21 +19,30 @@ func Verify(ctx context.Context, destination string, deep bool) error {
 }
 
 func verifyWithRunner(ctx context.Context, destination string, deep bool, runner gitinspect.Runner) error {
+	_, err := readVerifiedBackup(ctx, destination, deep, runner)
+	return err
+}
+
+func readVerifiedBackup(ctx context.Context, destination string, deep bool, runner gitinspect.Runner) (BackupMetadata, error) {
+	var metadata BackupMetadata
 	destination, err := filepath.Abs(destination)
 	if err != nil {
-		return err
+		return metadata, err
 	}
 	if err := rejectSymlinkRoot(destination); err != nil {
-		return err
+		return metadata, err
 	}
-	metadata, err := readBackupMetadata(filepath.Join(destination, "backup.json"))
+	metadata, err = readBackupMetadata(filepath.Join(destination, "backup.json"))
 	if err != nil {
-		return err
+		return metadata, err
 	}
 	if !metadata.Complete {
-		return errors.New("backup is incomplete")
+		return metadata, errors.New("backup is incomplete")
 	}
-	return verifyArtifacts(ctx, destination, metadata, deep, runner)
+	if err := verifyArtifacts(ctx, destination, metadata, deep, runner); err != nil {
+		return metadata, err
+	}
+	return metadata, nil
 }
 
 func verifyArtifacts(ctx context.Context, destination string, metadata BackupMetadata, deep bool, runner gitinspect.Runner) error {

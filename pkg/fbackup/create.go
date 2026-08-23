@@ -251,15 +251,6 @@ func createRepository(
 	return nil
 }
 
-func findArtifact(records []ArtifactRecord, repositoryID, kind string) (ArtifactRecord, bool) {
-	for _, record := range records {
-		if record.RepositoryID == repositoryID && record.Kind == kind {
-			return record, true
-		}
-	}
-	return ArtifactRecord{}, false
-}
-
 func validateMetadataOnlyRepository(ctx context.Context, repository RepositoryEntry, runner gitinspect.Runner) error {
 	if repository.Classification != ClassificationRecloneable {
 		return nil

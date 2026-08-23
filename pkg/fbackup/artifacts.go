@@ -85,6 +85,23 @@ func expectedArtifactKinds(classification Classification) []string {
 
 func artifactKey(repositoryID, kind string) string { return repositoryID + "\x00" + kind }
 
+func findArtifact(records []ArtifactRecord, repositoryID, kind string) (ArtifactRecord, bool) {
+	for _, record := range records {
+		if record.RepositoryID == repositoryID && record.Kind == kind {
+			return record, true
+		}
+	}
+	return ArtifactRecord{}, false
+}
+
+func findArtifactPath(root string, records []ArtifactRecord, repositoryID, kind string) (string, int64, bool) {
+	record, ok := findArtifact(records, repositoryID, kind)
+	if !ok {
+		return "", 0, false
+	}
+	return filepath.Join(root, filepath.FromSlash(record.Path)), record.Size, true
+}
+
 func writeJSONAtomic(path string, value any, mode os.FileMode, temporaryPattern string) error {
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
