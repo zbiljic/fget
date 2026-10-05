@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	dario.cat/mergo v1.0.2
 	github.com/alitto/pond/v2 v2.7.2
-	github.com/cenkalti/backoff/v7 v7.0.0
+	github.com/cenkalti/backoff/v7 v7.0.1
 	github.com/charlievieth/fastwalk v1.0.14
 	github.com/coreos/go-semver v0.3.1
 	github.com/fatih/structs v1.1.0
